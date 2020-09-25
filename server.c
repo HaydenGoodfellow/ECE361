@@ -41,8 +41,8 @@ int main(int argc, char **argv) {
     // Wait for input to the socket
     char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
     socklen_t clientAddrLen = sizeof(struct sockaddr);
-    recvfrom(sockfd, input, MAX_SOCKET_INPUT_SIZE, MSG_WAITALL | MSG_TRUNC,
-                                 (struct sockaddr *)&client, &clientAddrLen);
+    recvfrom(sockfd, input, MAX_SOCKET_INPUT_SIZE, MSG_WAITALL | MSG_TRUNC, 
+             (struct sockaddr *)&client, &clientAddrLen);
     // Check if input is valid
     if (strncmp(input, "ftp", 3) == 0) { // Input is valid
         printf("ftp message received\n");

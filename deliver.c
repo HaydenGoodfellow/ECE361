@@ -14,8 +14,8 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define MAX_USER_INPUT_SIZE 128
-#define MAX_SOCKET_INPUT_SIZE 128
+#define MAX_USER_INPUT_SIZE 128 // Chars
+#define MAX_SOCKET_INPUT_SIZE 128 // Bytes
 
 bool fileExists(char *name);
 
@@ -26,19 +26,19 @@ int main(int argc, char **argv) {
         return 0;
     }
     // Recieve the file name from the user and ensure its valid
-    char input[MAX_USER_INPUT_SIZE];
+    char userInput[MAX_USER_INPUT_SIZE];
     bool validInput = false;
     while (!validInput) {
         printf("Please input a file name using the following format:\nftp <File Name>\n");
-        fgets(input, MAX_USER_INPUT_SIZE, stdin);
+        fgets(userInput, MAX_USER_INPUT_SIZE, stdin);
         // Ensures user entered "ftp " at the start of input
-        if (strncmp("ftp ", input, 4) != 0) {
+        if (strncmp("ftp ", userInput, 4) != 0) {
             fprintf(stderr, "Invalid input, please try again\n");
             continue;
         }
         validInput = true;
     }
-    if (!fileExists(input + 4)) { // Plus 4 to remove the "ftp "
+    if (!fileExists(userInput + 4)) { // Plus 4 to remove the "ftp "
         fprintf(stderr, "File not found\n");
         return 0;
     }
@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Failed to create socket\n");
         return 0;
     }
-    char *serverAddr = argv[1];
+    //char *serverAddr = argv[1];
     int portNum = atoi(argv[2]);
     struct sockaddr_in server;
     // Set up server struct
@@ -59,7 +59,16 @@ int main(int argc, char **argv) {
     // Send info to server
     char ftp[] = "ftp";
     sendto(sockfd, ftp, strlen(ftp), MSG_CONFIRM, (struct sockaddr *)&server, sizeof(server));
-    
+    // Received info back from server
+    char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
+    socklen_t serverAddrLen = sizeof(struct sockaddr);
+    recvfrom(sockfd, input, MAX_SOCKET_INPUT_SIZE, MSG_WAITALL | MSG_TRUNC,
+             (struct sockaddr *)&server, &serverAddrLen);
+    if (strncmp(input, "yes", 3) == 0) 
+        printf("A file transfer can start\n");
+    else
+        fprintf(stderr, "Response from server not \"yes\"");
+    return 0;
 }
 
 // Currently assuming the file is in our current working directory
