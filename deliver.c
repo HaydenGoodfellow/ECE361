@@ -48,22 +48,23 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Failed to create socket\n");
         return 0;
     }
-    //char *serverAddr = argv[1];
-    int portNum = atoi(argv[2]);
+    char *hostname = argv[1];
+    char *portNum = argv[2];
+    struct addrinfo hints, *serverInfo;
     struct sockaddr_in server;
-    // Set up server struct
-    memset(&server, 0, sizeof(server));
-    server.sin_family = AF_INET;
-    server.sin_port = htons(portNum);
-    // Set up sending to ip address given
-    int atonReturn = inet_aton(argv[1], &(server.sin_addr));
-    if (atonReturn == 0) {
-        fprintf(stderr, "Invalid IP address given\n");
+    // Set up hints struct
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+    // Get address info
+    int getAddrReturn = getaddrinfo(hostname, portNum, &hints, &serverInfo);
+    if (getAddrReturn != 0) {
+        fprintf(stderr, "Failed to get address info: %s\n", gai_strerror(getAddrReturn));
         return 0;
     }
     // Send info to server
     char ftp[] = "ftp";
-    sendto(sockfd, ftp, strlen(ftp), MSG_CONFIRM, (struct sockaddr *)&server, sizeof(server));
+    sendto(sockfd, ftp, strlen(ftp), MSG_CONFIRM, serverInfo->ai_addr, serverInfo->ai_addrlen);
     // Receive info back from server
     char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
     socklen_t serverAddrLen = sizeof(struct sockaddr);
