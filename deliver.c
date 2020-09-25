@@ -21,13 +21,13 @@ bool fileExists(char *name);
 int main(int argc, char **argv) {
     // Ensure valid arguments are passed in
 	if (argc < 3 || (atoi(argv[2]) <= 0)) {
-        fprintf(stderr, "Incorrect usage. Please invoke using ./deliver <Server Address> <Server Port Number>\n");
+        fprintf(stderr, "Incorrect usage. Please invoke using \"deliver <Server Address> <Server Port Number>\"\n");
         return 0;
     }
+    // Recieve the file name from the user and ensure its valid
     char input[MAX_INPUT_SIZE];
     bool validInput = false;
     while (!validInput) {
-        // Recieve the file name from the user
         printf("Please input a file name using the following format:\nftp <File Name>\n");
         fgets(input, MAX_INPUT_SIZE, stdin);
         // Ensures user entered "ftp " at the start of input
@@ -41,6 +41,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "File not found\n");
         return 0;
     }
+    // Open socket 
 
 }
 

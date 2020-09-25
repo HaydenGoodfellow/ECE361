@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -g -Wall -Werror
+CFLAGS := -g -Wall
 
 server: server.o 
 	$(CC) -o server server.o
