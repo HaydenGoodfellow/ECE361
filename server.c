@@ -12,7 +12,6 @@
 #include <net/if.h>
 #include <sys/wait.h>
 #include <signal.h>
-#include <math.h>
 
 #define MAX_SOCKET_INPUT_SIZE 128 // Bytes
 
@@ -23,8 +22,7 @@ int main(int argc, char **argv) {
     }
     char *portNum = argv[1];
     struct addrinfo hints, *serverInfo, *ptr;
-    struct sockaddr_in client;
-    struct ifaddrs *ifaddr, *ifPtr;
+    struct sockaddr_in client;  
     // Set up hints struct
     memset(&hints, 0, sizeof(hints));
     hints.ai_flags = AI_PASSIVE;
@@ -57,6 +55,7 @@ int main(int argc, char **argv) {
     if (ptr == NULL) // Wasn't able to bind socket so exit program
         return 0;
     // Print the server computer's ip address
+    // struct ifaddrs *ifaddr, *ifPtr;
     // getifaddrs(&ifaddr);
     // for (ifPtr = ifaddr; ifPtr != NULL; ifPtr = ifPtr->ifa_next) {
     //     if (ifPtr->ifa_addr->sa_family == AF_INET) {
@@ -72,7 +71,7 @@ int main(int argc, char **argv) {
              (struct sockaddr *)&client, &clientAddrLen);
     // Check if input is valid
     if (strncmp(input, "ftp", 3) == 0) { // Input is valid
-        printf("ftp message received\n");
+        //printf("ftp message received\n");
         char yes[] = "yes";
         // Reply with "yes"
         sendto(sockfd, yes, strlen(yes), MSG_CONFIRM, (struct sockaddr *)&client, clientAddrLen);
