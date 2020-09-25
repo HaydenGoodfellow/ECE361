@@ -23,9 +23,9 @@ int main(int argc, char **argv) {
     struct sockaddr_in server, client;
     // Set up server struct
     memset(&server, 0, sizeof(server));
+    server.sin_addr.s_addr = INADDR_ANY; // Need to change
     server.sin_family = AF_INET;
     server.sin_port = htons(portNum);
-    server.sin_addr.s_addr = INADDR_ANY;
     // Set up socket
     int sockfd = socket(AF_INET /*IPv4*/, SOCK_DGRAM /*UDP*/, 0);
     if (sockfd < 0) {
@@ -45,6 +45,7 @@ int main(int argc, char **argv) {
                                  (struct sockaddr *)&client, &clientAddrLen);
     // Check if input is valid
     if (strncmp(input, "ftp", 3) == 0) { // Input is valid
+        printf("ftp message received\n");
         char yes[] = "yes";
         // Reply with "yes"
         sendto(sockfd, yes, strlen(yes), MSG_CONFIRM, (struct sockaddr *)&client, clientAddrLen);

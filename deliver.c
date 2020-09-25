@@ -14,7 +14,8 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define MAX_INPUT_SIZE 128
+#define MAX_USER_INPUT_SIZE 128
+#define MAX_SOCKET_INPUT_SIZE 128
 
 bool fileExists(char *name);
 
@@ -25,11 +26,11 @@ int main(int argc, char **argv) {
         return 0;
     }
     // Recieve the file name from the user and ensure its valid
-    char input[MAX_INPUT_SIZE];
+    char input[MAX_USER_INPUT_SIZE];
     bool validInput = false;
     while (!validInput) {
         printf("Please input a file name using the following format:\nftp <File Name>\n");
-        fgets(input, MAX_INPUT_SIZE, stdin);
+        fgets(input, MAX_USER_INPUT_SIZE, stdin);
         // Ensures user entered "ftp " at the start of input
         if (strncmp("ftp ", input, 4) != 0) {
             fprintf(stderr, "Invalid input, please try again\n");
@@ -42,7 +43,23 @@ int main(int argc, char **argv) {
         return 0;
     }
     // Open socket 
-
+    int sockfd = socket(AF_INET /*IPv4*/, SOCK_DGRAM /*UDP*/, 0);
+    if (sockfd < 0) {
+        fprintf(stderr, "Failed to create socket\n");
+        return 0;
+    }
+    char *serverAddr = argv[1];
+    int portNum = atoi(argv[2]);
+    struct sockaddr_in server;
+    // Set up server struct
+    memset(&server, 0, sizeof(server));
+    server.sin_addr.s_addr = INADDR_ANY; // Need to change
+    server.sin_family = AF_INET;
+    server.sin_port = htons(portNum);
+    // Send info to server
+    char ftp[] = "ftp";
+    sendto(sockfd, ftp, strlen(ftp), MSG_CONFIRM, (struct sockaddr *)&server, sizeof(server));
+    
 }
 
 // Currently assuming the file is in our current working directory
