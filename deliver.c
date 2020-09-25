@@ -11,6 +11,10 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-int main(int argc, char* argv) {
-	
+int main(int argc, char **argv) {
+	if (argc < 3 || (atoi(argv[2]) <= 0)) {
+        fprintf(stderr, "Incorrect usage. Please invoke using ./deliver <Server Address> <Server Port Number>\n");
+        return 0;
+    }
+
 }
