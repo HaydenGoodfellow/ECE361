@@ -48,14 +48,14 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Failed to create socket\n");
         return 0;
     }
-    char *hostname = argv[1];
+    char *hostname = argv[1]; // Hostname or IPv4 address
     char *portNum = argv[2];
     struct addrinfo hints, *serverInfo;
     struct sockaddr_in server;
     // Set up hints struct
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_family = AF_INET; // Ensures IPv4
+    hints.ai_socktype = SOCK_DGRAM; // Ensures UDP
     // Get address info
     int getAddrReturn = getaddrinfo(hostname, portNum, &hints, &serverInfo);
     if (getAddrReturn != 0) {

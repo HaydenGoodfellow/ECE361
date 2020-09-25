@@ -57,14 +57,14 @@ int main(int argc, char **argv) {
     if (ptr == NULL) // Wasn't able to bind socket so exit program
         return 0;
     // Print the server computer's ip address
-    getifaddrs(&ifaddr);
-    for (ifPtr = ifaddr; ifPtr != NULL; ifPtr = ifPtr->ifa_next) {
-        if (ifPtr->ifa_addr->sa_family == AF_INET) {
-            char *ipaddr = inet_ntoa(((struct sockaddr_in *)ifPtr->ifa_addr)->sin_addr);
-            if (strncmp(ipaddr, "127.", 4) != 0) // Ignore loopback address
-            printf("Server computer's IP address: %s\n", ipaddr);
-        }
-    }
+    // getifaddrs(&ifaddr);
+    // for (ifPtr = ifaddr; ifPtr != NULL; ifPtr = ifPtr->ifa_next) {
+    //     if (ifPtr->ifa_addr->sa_family == AF_INET) {
+    //         char *ipaddr = inet_ntoa(((struct sockaddr_in *)ifPtr->ifa_addr)->sin_addr);
+    //         if (strncmp(ipaddr, "127.", 4) != 0) // Ignore loopback address
+    //         printf("Server computer's IP address: %s\n", ipaddr);
+    //     }
+    // }
     // Wait for input to the socket
     char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
     socklen_t clientAddrLen = sizeof(struct sockaddr);
