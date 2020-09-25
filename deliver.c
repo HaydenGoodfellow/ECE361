@@ -53,13 +53,18 @@ int main(int argc, char **argv) {
     struct sockaddr_in server;
     // Set up server struct
     memset(&server, 0, sizeof(server));
-    server.sin_addr.s_addr = INADDR_ANY; // Need to change
     server.sin_family = AF_INET;
     server.sin_port = htons(portNum);
+    // Set up sending to ip address given
+    int atonReturn = inet_aton(argv[1], &(server.sin_addr));
+    if (atonReturn == 0) {
+        fprintf(stderr, "Invalid IP address given\n");
+        return 0;
+    }
     // Send info to server
     char ftp[] = "ftp";
     sendto(sockfd, ftp, strlen(ftp), MSG_CONFIRM, (struct sockaddr *)&server, sizeof(server));
-    // Received info back from server
+    // Receive info back from server
     char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
     socklen_t serverAddrLen = sizeof(struct sockaddr);
     recvfrom(sockfd, input, MAX_SOCKET_INPUT_SIZE, MSG_WAITALL | MSG_TRUNC,

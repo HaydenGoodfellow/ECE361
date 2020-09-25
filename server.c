@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <sys/wait.h>
@@ -19,13 +20,20 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Incorrect usage. Please invoke using \"server <UDP Listen Port>\"\n");
         return 0;
     }
-    int portNum = atoi(argv[1]);
-    struct sockaddr_in server, client;
-    // Set up server struct
-    memset(&server, 0, sizeof(server));
-    server.sin_addr.s_addr = INADDR_ANY; // Need to change
-    server.sin_family = AF_INET;
-    server.sin_port = htons(portNum);
+    char *portNum = argv[1];
+    struct addrinfo hints, *serverInfo, *ptr;
+    struct sockaddr_in client;
+    // Set up hints struct
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_flags = AI_PASSIVE;
+    hints.ai_family = AF_INET; // Ensures IPv4
+    hints.ai_socktype = SOCK_DGRAM; // Ensures UDP
+    // Get address info
+    int getAddrReturn = getaddrinfo(NULL, portNum, &hints, &serverInfo);
+    if (getAddrReturn != 0) {
+        fprintf(stderr, "Failed to get address info: %s\n", gai_strerror(getAddrReturn));
+        return 0;
+    }
     // Set up socket
     int sockfd = socket(AF_INET /*IPv4*/, SOCK_DGRAM /*UDP*/, 0);
     if (sockfd < 0) {
@@ -33,11 +41,25 @@ int main(int argc, char **argv) {
         return 0;
     }
     // Bind socket
-    int bindReturn = bind(sockfd, (struct sockaddr *)&server, sizeof(server));
-    if (bindReturn < 0) {
-        fprintf(stderr, "Failed to bind socket\n");
-        return 0;
+    ptr = serverInfo;
+    while (ptr != NULL) {
+        int bindReturn = bind(sockfd, ptr->ai_addr, ptr->ai_addrlen);
+        if (bindReturn < 0) {
+            fprintf(stderr, "Failed to bind socket\n");
+            ptr = ptr->ai_next;
+            continue;
+        }
+        else
+            break;
     }
+    if (ptr != NULL) {
+         // Successfully bound socket, print its info
+        struct sockaddr_in *addr;
+        addr = ((struct sockaddr_in *)ptr->ai_addr);
+        printf("Successfully bound socket on %s\n", inet_ntoa((struct in_addr)addr->sin_addr));
+    }
+    else // Wasn't able to bind socket so exit program
+        return 0;
     // Wait for input to the socket
     char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
     socklen_t clientAddrLen = sizeof(struct sockaddr);
