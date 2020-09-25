@@ -5,10 +5,11 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <ifaddrs.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <arpa/inet.h>
+#include <net/if.h>
 #include <sys/wait.h>
 #include <signal.h>
 #include <math.h>
@@ -23,6 +24,7 @@ int main(int argc, char **argv) {
     char *portNum = argv[1];
     struct addrinfo hints, *serverInfo, *ptr;
     struct sockaddr_in client;
+    struct ifaddrs *ifaddr, *ifPtr;
     // Set up hints struct
     memset(&hints, 0, sizeof(hints));
     hints.ai_flags = AI_PASSIVE;
@@ -52,14 +54,17 @@ int main(int argc, char **argv) {
         else
             break;
     }
-    if (ptr != NULL) {
-         // Successfully bound socket, print its info
-        struct sockaddr_in *addr;
-        addr = ((struct sockaddr_in *)ptr->ai_addr);
-        printf("Successfully bound socket on %s\n", inet_ntoa((struct in_addr)addr->sin_addr));
-    }
-    else // Wasn't able to bind socket so exit program
+    if (ptr == NULL) // Wasn't able to bind socket so exit program
         return 0;
+    // Print the server computer's ip address
+    getifaddrs(&ifaddr);
+    for (ifPtr = ifaddr; ifPtr != NULL; ifPtr = ifPtr->ifa_next) {
+        if (ifPtr->ifa_addr->sa_family == AF_INET) {
+            char *ipaddr = inet_ntoa(((struct sockaddr_in *)ifPtr->ifa_addr)->sin_addr);
+            if (strncmp(ipaddr, "127.", 4) != 0) // Ignore loopback address
+            printf("Server computer's IP address: %s\n", ipaddr);
+        }
+    }
     // Wait for input to the socket
     char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
     socklen_t clientAddrLen = sizeof(struct sockaddr);
