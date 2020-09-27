@@ -19,9 +19,6 @@
 
 bool fileExists(char *name);
 
-// Parts of this code were adapted from Beej's Guide to Network Programming
-// Found online at: https://beej.us/guide/bgnet/html/
-
 int main(int argc, char **argv) {
     // Ensure valid arguments are passed in
 	if (argc < 3 || (atoi(argv[2]) <= 0)) {

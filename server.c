@@ -15,9 +15,6 @@
 
 #define MAX_SOCKET_INPUT_SIZE 128 // Bytes
 
-// Parts of this code were adapted from Beej's Guide to Network Programming
-// Found online at: https://beej.us/guide/bgnet/html/
-
 int main(int argc, char **argv) {
 	if (argc < 2 || (atoi(argv[1]) <= 0)) {
         fprintf(stderr, "Incorrect usage. Please invoke using \"server <UDP Listen Port>\"\n");
