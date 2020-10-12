@@ -1,0 +1,2 @@
+gcc -g -Wall -Werror   -c -o server.o server.c
+gcc -o server server.o
