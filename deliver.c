@@ -6,6 +6,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <math.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -87,8 +88,10 @@ int main(int argc, char **argv) {
     double rtt = (recv.tv_sec - send.tv_sec) * 1000 * 1000; // us
     rtt += ((recv.tv_usec - send.tv_usec)); // us
     printf("RTT is %.0f us\n", rtt);
-    if (strncmp(input, "yes", 3) == 0) 
+    if (strncmp(input, "yes", 3) == 0) {
         printf("A file transfer can start\n");
+        transferFile(sockfd, userInput + 4, serverInfo);
+    }
     else
         fprintf(stderr, "Response from server not \"yes\"");
     return 0;
@@ -105,14 +108,15 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
         fprintf(stderr, "Error opening file: %s\n", name);
     // Determine number of fragments needed
     long fileSize = getFileSize(srcFile);
-    unsigned totalNumFragments = ceil(((double) fileSize) / 1000);
+    unsigned totalNumFragments = (unsigned) ceil(((double) fileSize) / 1000.0);
     // Send fragments one by one
     for (int fragNum = 1; fragNum <= totalNumFragments; ++fragNum) {
+        fprintf(stderr, "fragNum: %d\n", fragNum);
         Packet packet = {totalNumFragments, fragNum, 0, name};
         char buf[1000];
         int readReturn = read(srcFile, buf, 1000);
         if (readReturn < 0)
-            fprintf(stderr, "Error reading from file: %s\n", name);
+            fprintf(stderr, "Error reading from file: %s\n", srcPath);
         packet.size = readReturn;
         memcpy(packet.filedata, buf, readReturn);
         
@@ -141,11 +145,15 @@ char *packetToString(Packet pk) {
     char *result = (char *)malloc(sizeof(char) * 100);
     // Print everything but data into the string
     bytesPrinted = snprintf(result, 100, "%u:%u:%u:%s:", pk.totalFragments, pk.fragNum, pk.size, pk.filename);
-    fprintf("String without data: %s\nLength: %d\n", result, strlen(result));
+    fprintf(stderr, "String without data: %s\nLength: %lu\n", result, strlen(result));
     // Resize string to have space to store data
     result = (char *)realloc(result, bytesPrinted + 1 + pk.size);
     // + 1 so it inserts data where snprintf put '\0'
     memcpy(result + bytesPrinted + 1, pk.filedata, pk.size);
+    fprintf(stderr, "String with data: ");
+    for (int i = 0; i < bytesPrinted + 1 + pk.size; ++i)
+        fprintf(stderr, "%c", result[i]);
+    fprintf(stderr, "\n");
     return result;
 }
 
