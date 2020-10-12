@@ -24,7 +24,7 @@
 #define MAX_SOCKET_INPUT_SIZE 128 // Bytes
 
 void transferFile(int sockfd, char *filename, struct addrinfo *serverInfo);
-unsigned packetToString(Packet pk, char *result);
+char *packetToString(Packet pk, unsigned *size);
 bool fileExists(char *name);
 off_t getFileSize(int fd);
 
@@ -126,10 +126,12 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
         packet.size = readReturn;
         // Store data into packet
         memcpy(packet.filedata, buf, readReturn);
-        char *result = NULL;
+        unsigned strLength;
+        char *packetAsString = packetToString(packet, &strLength);
         // Convert packet to string and send to server
-        unsigned strLength = packetToString(packet, result);
-        sendto(sockfd, result, strLength, MSG_CONFIRM, serverInfo->ai_addr, serverInfo->ai_addrlen);
+        int sendRet = sendto(sockfd, packetAsString, strLength, 0, serverInfo->ai_addr, serverInfo->ai_addrlen);
+        if (sendRet < 0)
+            perror("Error");
         // Wait for acknowledgement from server
         bool ackRecvied = false;
         while (!ackRecvied) {
@@ -157,10 +159,10 @@ bool fileExists(char *name) {
 }
 
 // Converts packet to a string we can send over the socket
-unsigned packetToString(Packet pk, char *result) {
+char *packetToString(Packet pk, unsigned *size) {
     int bytesPrinted = 0;
     // Allocate on heap a string with enough size for everything but data
-    result = (char *)malloc(sizeof(char) * 100);
+    char *result = (char *)malloc(sizeof(char) * 100);
     // Print everything but data into the string
     bytesPrinted = snprintf(result, 100, "%u:%u:%u:%s:", pk.totalFragments, pk.fragNum, pk.size, pk.filename);
     fprintf(stderr, "String without data: %s\nLength: %lu\n", result, strlen(result));
@@ -172,7 +174,8 @@ unsigned packetToString(Packet pk, char *result) {
     for (int i = 0; i < bytesPrinted + pk.size; ++i)
         fprintf(stderr, "%c", result[i]);
     fprintf(stderr, "\nLength: %d\n", bytesPrinted + pk.size);
-    return bytesPrinted + pk.size;
+    *size = bytesPrinted + pk.size;
+    return result;
 }
 
 // Get size of file in bytes

@@ -102,11 +102,27 @@ void receiveFile(int sockfd, struct sockaddr_in *client, socklen_t *clientAddrLe
     char *input = malloc(sizeof(char) * MAX_PACKET_INPUT_SIZE);
     recvfrom(sockfd, input, MAX_PACKET_INPUT_SIZE, MSG_TRUNC, 
              (struct sockaddr *)client, clientAddrLen);
-    Packet packet;
+    fprintf(stderr, "Packet received over socket\n");
+    Packet packet = stringToPacket(input);
+    int fd = creat("./test2.txt", S_IRWXU);
+    int writeReturn = write(fd, packet.filedata, packet.size);
+    if (writeReturn < 0)
+        fprintf(stderr, "Error writing to new file\n");
 }
 
 // Converts string we received over socket into packet
 Packet stringToPacket(char *input) {
     Packet packet;
-
+    packet.totalFragments = atoi(strtok(input, ":"));
+    packet.fragNum = atoi(strtok(NULL, ":"));
+    packet.size = atoi(strtok(NULL, ":"));
+    packet.filename = strtok(NULL, ":");
+    if (packet.totalFragments <= 0 || packet.fragNum <= 0 || packet.size <= 0)
+        fprintf(stderr, "Error in transmission\n");
+    // Find index in string where data section starts. + 4 to account for ':'
+    unsigned dataIndex = strlen(strtok(input, ":")) + 4;
+    for (int i = 0; i < 3; ++i)
+        dataIndex += strlen(strtok(NULL, ":"));
+    memcpy(packet.filedata, input + dataIndex, packet.size);
+    return packet;
 }
