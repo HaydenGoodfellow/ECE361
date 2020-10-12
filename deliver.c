@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <string.h>
 #include <dirent.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -15,10 +16,15 @@
 #include <sys/wait.h>
 #include <signal.h>
 
+#include "packet.h"
+
 #define MAX_USER_INPUT_SIZE 128 // Chars
 #define MAX_SOCKET_INPUT_SIZE 128 // Bytes
 
+void transferFile(int sockfd, char *filename, struct addrinfo *serverInfo);
+char *packetToString(Packet packet);
 bool fileExists(char *name);
+off_t getFileSize(int fd);
 
 // Parts of this code was adapted from Beej's Guide to Network Programming
 // Found online at: https://beej.us/guide/bgnet/html/
@@ -88,6 +94,31 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+// Transfer a file to server over socket sockfd
+void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
+    // Open file
+    char *srcPath = (char *)malloc(sizeof(char) * MAX_USER_INPUT_SIZE);
+    strcpy(srcPath, "./");
+    strncpy(srcPath + 3, name, strlen(name));
+    int srcFile = open(srcPath, O_RDONLY);
+    if (srcFile < 0)
+        fprintf(stderr, "Error opening file: %s\n", name);
+    // Determine number of fragments needed
+    long fileSize = getFileSize(srcFile);
+    unsigned totalNumFragments = ceil(((double) fileSize) / 1000);
+    // Send fragments one by one
+    for (int fragNum = 1; fragNum <= totalNumFragments; ++fragNum) {
+        Packet packet = {totalNumFragments, fragNum, 0, name};
+        char buf[1000];
+        int readReturn = read(srcFile, buf, 1000);
+        if (readReturn < 0)
+            fprintf(stderr, "Error reading from file: %s\n", name);
+        packet.size = readReturn;
+        memcpy(packet.filedata, buf, readReturn);
+        
+    }
+}
+
 // Currently assuming the file is in our current working directory
 bool fileExists(char *name) {
     //fprintf(stderr, "Name: %s\n", name);
@@ -101,4 +132,27 @@ bool fileExists(char *name) {
         entry = readdir(dir);
     }
     return false;
+}
+
+// Converts packet to a string we can send over the socket
+char *packetToString(Packet pk) {
+    int bytesPrinted = 0;
+    // Allocate on heap a string with enough size for everything but data
+    char *result = (char *)malloc(sizeof(char) * 100);
+    // Print everything but data into the string
+    bytesPrinted = snprintf(result, 100, "%u:%u:%u:%s:", pk.totalFragments, pk.fragNum, pk.size, pk.filename);
+    fprintf("String without data: %s\nLength: %d\n", result, strlen(result));
+    // Resize string to have space to store data
+    result = (char *)realloc(result, bytesPrinted + 1 + pk.size);
+    // + 1 so it inserts data where snprintf put '\0'
+    memcpy(result + bytesPrinted + 1, pk.filedata, pk.size);
+    return result;
+}
+
+// Get size of file in bytes
+off_t getFileSize(int fd) {
+    struct stat fileStats;
+    if (fstat(fd, &fileStats) == -1)
+        fprintf(stderr, "Error reading file stats\n");
+    return fileStats.st_size;
 }

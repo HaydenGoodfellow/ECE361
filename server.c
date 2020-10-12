@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <ifaddrs.h>
@@ -12,6 +13,8 @@
 #include <net/if.h>
 #include <sys/wait.h>
 #include <signal.h>
+
+#include "packet.h"
 
 #define MAX_SOCKET_INPUT_SIZE 128 // Bytes
 
