@@ -101,14 +101,16 @@ int main(int argc, char **argv) {
 void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
     // Open file
     char *srcPath = (char *)malloc(sizeof(char) * MAX_USER_INPUT_SIZE);
-    strcpy(srcPath, "./");
-    strncpy(srcPath + 3, name, strlen(name));
+    // - 1 to remove the '\n' character from being read
+    strncpy(srcPath, name, strlen(name) - 1);
+    srcPath[strlen(name) - 1] = '\0';
     int srcFile = open(srcPath, O_RDONLY);
     if (srcFile < 0)
-        fprintf(stderr, "Error opening file: %s\n", name);
+        fprintf(stderr, "Error opening file: %s\n", srcPath);
     // Determine number of fragments needed
     long fileSize = getFileSize(srcFile);
     unsigned totalNumFragments = (unsigned) ceil(((double) fileSize) / 1000.0);
+    fprintf(stderr, "Total number of fragments: %u\n", totalNumFragments);
     // Send fragments one by one
     for (int fragNum = 1; fragNum <= totalNumFragments; ++fragNum) {
         fprintf(stderr, "fragNum: %d\n", fragNum);
