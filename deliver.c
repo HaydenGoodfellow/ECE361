@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
@@ -99,14 +100,20 @@ int main(int argc, char **argv) {
 
 // Transfer a file to server over socket sockfd
 void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
+    // Get proper pathname to file by stripping whitespaces
+    char *end = name + strlen(name) - 1;
+    while ((end > name) && isspace((unsigned char)*end))
+        end--;
+    end[1] = '\0';
+
+    // char *srcPath = (char *)malloc(sizeof(char) * MAX_USER_INPUT_SIZE);
+    // // - 1 to remove the '\n' character from being read
+    // strncpy(srcPath, name, strlen(name) - 1);
+    // srcPath[strlen(name) - 1] = '\0';
     // Open file
-    char *srcPath = (char *)malloc(sizeof(char) * MAX_USER_INPUT_SIZE);
-    // - 1 to remove the '\n' character from being read
-    strncpy(srcPath, name, strlen(name) - 1);
-    srcPath[strlen(name) - 1] = '\0';
-    int srcFile = open(srcPath, O_RDONLY);
+    int srcFile = open(name, O_RDONLY);
     if (srcFile < 0)
-        fprintf(stderr, "Error opening file: %s\n", srcPath);
+        fprintf(stderr, "Error opening file: %s\n", name);
     // Determine number of fragments needed
     long fileSize = getFileSize(srcFile);
     unsigned totalNumFragments = (unsigned) ceil(((double) fileSize) / 1000.0);
@@ -118,7 +125,7 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
         char buf[1000];
         int readReturn = read(srcFile, buf, 1000);
         if (readReturn < 0)
-            fprintf(stderr, "Error reading from file: %s\n", srcPath);
+            fprintf(stderr, "Error reading from file: %s\n", name);
         packet.size = readReturn;
         memcpy(packet.filedata, buf, readReturn);
         
