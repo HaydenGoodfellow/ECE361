@@ -17,8 +17,10 @@
 #include "packet.h"
 
 #define MAX_SOCKET_INPUT_SIZE 128 // Bytes
+#define MAX_PACKET_INPUT_SIZE 1200 // Bytes
 
 void receiveFile(int sockfd, struct sockaddr_in *client, socklen_t *clientAddrLen);
+Packet stringToPacket(char *input);
 
 // Parts of this code was adapted from Beej's Guide to Network Programming
 // Found online at: https://beej.us/guide/bgnet/html/
@@ -95,6 +97,16 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+// Receive file over socket and store it
 void receiveFile(int sockfd, struct sockaddr_in *client, socklen_t *clientAddrLen) {
-    
+    char *input = malloc(sizeof(char) * MAX_PACKET_INPUT_SIZE);
+    recvfrom(sockfd, input, MAX_PACKET_INPUT_SIZE, MSG_TRUNC, 
+             (struct sockaddr *)client, clientAddrLen);
+    Packet packet;
+}
+
+// Converts string we received over socket into packet
+Packet stringToPacket(char *input) {
+    Packet packet;
+
 }

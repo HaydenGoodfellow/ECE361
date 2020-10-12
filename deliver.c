@@ -171,7 +171,7 @@ unsigned packetToString(Packet pk, char *result) {
     fprintf(stderr, "String with data: ");
     for (int i = 0; i < bytesPrinted + pk.size; ++i)
         fprintf(stderr, "%c", result[i]);
-    fprintf(stderr, "\n");
+    fprintf(stderr, "\nLength: %d\n", bytesPrinted + pk.size);
     return bytesPrinted + pk.size;
 }
 
