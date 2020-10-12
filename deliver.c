@@ -24,7 +24,7 @@
 #define MAX_SOCKET_INPUT_SIZE 128 // Bytes
 
 void transferFile(int sockfd, char *filename, struct addrinfo *serverInfo);
-char *packetToString(Packet packet);
+unsigned packetToString(Packet pk, char *result);
 bool fileExists(char *name);
 off_t getFileSize(int fd);
 
@@ -105,11 +105,6 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
     while ((end > name) && isspace((unsigned char)*end))
         end--;
     end[1] = '\0';
-
-    // char *srcPath = (char *)malloc(sizeof(char) * MAX_USER_INPUT_SIZE);
-    // // - 1 to remove the '\n' character from being read
-    // strncpy(srcPath, name, strlen(name) - 1);
-    // srcPath[strlen(name) - 1] = '\0';
     // Open file
     int srcFile = open(name, O_RDONLY);
     if (srcFile < 0)
@@ -121,14 +116,28 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
     // Send fragments one by one
     for (int fragNum = 1; fragNum <= totalNumFragments; ++fragNum) {
         fprintf(stderr, "fragNum: %d\n", fragNum);
+        // Create and initialize packet
         Packet packet = {totalNumFragments, fragNum, 0, name};
         char buf[1000];
+        // Read up to 1000 bytes from file
         int readReturn = read(srcFile, buf, 1000);
         if (readReturn < 0)
             fprintf(stderr, "Error reading from file: %s\n", name);
         packet.size = readReturn;
+        // Store data into packet
         memcpy(packet.filedata, buf, readReturn);
-        
+        char *result = NULL;
+        // Convert packet to string and send to server
+        unsigned strLength = packetToString(packet, result);
+        sendto(sockfd, result, strLength, MSG_CONFIRM, serverInfo->ai_addr, serverInfo->ai_addrlen);
+        // Wait for acknowledgement from server
+        bool ackRecvied = false;
+        while (!ackRecvied) {
+            char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
+            recv(sockfd, input, MAX_SOCKET_INPUT_SIZE, MSG_TRUNC);
+            if (strncmp(input, "ACK", 3) == 0)
+                ackRecvied = true;
+        }
     }
 }
 
@@ -148,22 +157,22 @@ bool fileExists(char *name) {
 }
 
 // Converts packet to a string we can send over the socket
-char *packetToString(Packet pk) {
+unsigned packetToString(Packet pk, char *result) {
     int bytesPrinted = 0;
     // Allocate on heap a string with enough size for everything but data
-    char *result = (char *)malloc(sizeof(char) * 100);
+    result = (char *)malloc(sizeof(char) * 100);
     // Print everything but data into the string
     bytesPrinted = snprintf(result, 100, "%u:%u:%u:%s:", pk.totalFragments, pk.fragNum, pk.size, pk.filename);
     fprintf(stderr, "String without data: %s\nLength: %lu\n", result, strlen(result));
     // Resize string to have space to store data
-    result = (char *)realloc(result, bytesPrinted + 1 + pk.size);
-    // + 1 so it inserts data where snprintf put '\0'
-    memcpy(result + bytesPrinted + 1, pk.filedata, pk.size);
+    result = (char *)realloc(result, bytesPrinted + pk.size);
+    // Inserts data where snprintf put '\0'
+    memcpy(result + bytesPrinted, pk.filedata, pk.size);
     fprintf(stderr, "String with data: ");
-    for (int i = 0; i < bytesPrinted + 1 + pk.size; ++i)
+    for (int i = 0; i < bytesPrinted + pk.size; ++i)
         fprintf(stderr, "%c", result[i]);
     fprintf(stderr, "\n");
-    return result;
+    return bytesPrinted + pk.size;
 }
 
 // Get size of file in bytes

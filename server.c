@@ -18,6 +18,8 @@
 
 #define MAX_SOCKET_INPUT_SIZE 128 // Bytes
 
+void receiveFile(int sockfd, struct sockaddr_in *client, socklen_t *clientAddrLen);
+
 // Parts of this code was adapted from Beej's Guide to Network Programming
 // Found online at: https://beej.us/guide/bgnet/html/
 
@@ -81,6 +83,8 @@ int main(int argc, char **argv) {
         char yes[] = "yes";
         // Reply with "yes"
         sendto(sockfd, yes, strlen(yes), MSG_CONFIRM, (struct sockaddr *)&client, clientAddrLen);
+        // Receive file transfer
+        receiveFile(sockfd, &client, &clientAddrLen);
     }
     else { // Input is not valid
         char no[] = "no";
@@ -89,4 +93,8 @@ int main(int argc, char **argv) {
     }
     close(sockfd);
     return 0;
+}
+
+void receiveFile(int sockfd, struct sockaddr_in *client, socklen_t *clientAddrLen) {
+    
 }
