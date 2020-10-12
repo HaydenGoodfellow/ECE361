@@ -113,16 +113,18 @@ void receiveFile(int sockfd, struct sockaddr_in *client, socklen_t *clientAddrLe
 // Converts string we received over socket into packet
 Packet stringToPacket(char *input) {
     Packet packet;
-    packet.totalFragments = atoi(strtok(input, ":"));
-    packet.fragNum = atoi(strtok(NULL, ":"));
-    packet.size = atoi(strtok(NULL, ":"));
-    packet.filename = strtok(NULL, ":");
+    char *totalFragStr = strtok(input, ":");
+    char *fragNumStr = strtok(NULL, ":");
+    char *sizeStr = strtok(NULL, ":");
+    char *fileName = strtok(NULL, ":");
+    packet.totalFragments = atoi(totalFragStr);
+    packet.fragNum = atoi(fragNumStr);
+    packet.size = atoi(sizeStr);
+    packet.filename = fileName;
     if (packet.totalFragments <= 0 || packet.fragNum <= 0 || packet.size <= 0)
         fprintf(stderr, "Error in transmission\n");
     // Find index in string where data section starts. + 4 to account for ':'
-    unsigned dataIndex = strlen(strtok(input, ":")) + 4;
-    for (int i = 0; i < 3; ++i)
-        dataIndex += strlen(strtok(NULL, ":"));
+    unsigned dataIndex = 4 + strlen(totalFragStr) + strlen(fragNumStr) + strlen(sizeStr) + strlen(fileName);
     memcpy(packet.filedata, input + dataIndex, packet.size);
     return packet;
 }
