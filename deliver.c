@@ -141,7 +141,8 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
                 ackRecvied = true; 
             // Packet not received so send again
             else if (strncmp(input, "NACK", 4) == 0) {
-                int sendRet = sendto(sockfd, packetAsString, strLength, 0, serverInfo->ai_addr, serverInfo->ai_addrlen);
+                int sendRet = sendto(sockfd, packetAsString, strLength, 0, 
+                                    serverInfo->ai_addr, serverInfo->ai_addrlen);
                 if (sendRet < 0)
                     perror("Error");
             }

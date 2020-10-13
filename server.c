@@ -128,9 +128,9 @@ void receiveFile(int sockfd, struct sockaddr_in *client, socklen_t *clientAddrLe
     struct timeval t;
     t.tv_sec = 1;
     t.tv_usec = 0;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &t, sizeof(t)) < 0) {
+    int sockOptRet = setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &t, sizeof(t));
+    if (sockOptRet < 0) 
         perror("Error");
-    }
     // Else get all packets, acknowledge them, and write their contents to the new file
     for (unsigned lastPackNum = 1; lastPackNum < packet.totalFragments; ++lastPackNum) {
         bool packetRecv = false;
