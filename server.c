@@ -1,11 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>  
 #include <assert.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
@@ -122,10 +124,29 @@ void receiveFile(int sockfd, struct sockaddr_in *client, socklen_t *clientAddrLe
     // If there was only one packet we're done
     if (packet.totalFragments == 1)
         return;
+    // Change socket to one second timeout so we can send NACK if we don't receive a packet in time
+    struct timeval t;
+    t.tv_sec = 1;
+    t.tv_usec = 0;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &t, sizeof(t)) < 0) {
+        perror("Error");
+    }
     // Else get all packets, acknowledge them, and write their contents to the new file
     for (unsigned lastPackNum = 1; lastPackNum < packet.totalFragments; ++lastPackNum) {
-        recvfrom(sockfd, input, MAX_PACKET_INPUT_SIZE, MSG_TRUNC, 
-             (struct sockaddr *)client, clientAddrLen);
+        bool packetRecv = false;
+        while (!packetRecv) {
+            int recvVal = recvfrom(sockfd, input, MAX_PACKET_INPUT_SIZE, MSG_TRUNC, 
+                                  (struct sockaddr *)client, clientAddrLen);
+            if (recvVal > 0)
+                packetRecv = true;
+            else { // Didn't receive so send NACK
+                fprintf(stderr, "Packet not received over socket, sending NACK\n");
+                sprintf(ack, "NACK%u", lastPackNum + 1);
+                int sendRet = sendto(sockfd, ack, strlen(ack), MSG_CONFIRM, (struct sockaddr *)client, *clientAddrLen);
+                if (sendRet < 0)
+                    perror("Error");
+            }
+        }
         fprintf(stderr, "Packet received over socket\n");
         Packet packet = stringToPacket(input);
         assert(packet.fragNum == (lastPackNum + 1));

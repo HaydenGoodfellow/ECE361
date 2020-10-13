@@ -137,8 +137,14 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
         while (!ackRecvied) {
             char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
             recv(sockfd, input, MAX_SOCKET_INPUT_SIZE, MSG_TRUNC);
-            if (strncmp(input, "ACK", 3) == 0)
-                ackRecvied = true;
+            if (strncmp(input, "ACK", 3) == 0) 
+                ackRecvied = true; 
+            // Packet not received so send again
+            else if (strncmp(input, "NACK", 4) == 0) {
+                int sendRet = sendto(sockfd, packetAsString, strLength, 0, serverInfo->ai_addr, serverInfo->ai_addrlen);
+                if (sendRet < 0)
+                    perror("Error");
+            }
         }
     }
 }
@@ -170,10 +176,10 @@ char *packetToString(Packet pk, unsigned *size) {
     result = (char *)realloc(result, bytesPrinted + pk.size);
     // Inserts data where snprintf put '\0'
     memcpy(result + bytesPrinted, pk.filedata, pk.size);
-    fprintf(stderr, "String with data: ");
-    for (int i = 0; i < bytesPrinted + pk.size; ++i)
-        fprintf(stderr, "%c", result[i]);
-    fprintf(stderr, "\nLength: %d\n", bytesPrinted + pk.size);
+    // fprintf(stderr, "String with data: ");
+    // for (int i = 0; i < bytesPrinted + pk.size; ++i)
+    //     fprintf(stderr, "%c", result[i]);
+    // fprintf(stderr, "\nLength: %d\n", bytesPrinted + pk.size);
     *size = bytesPrinted + pk.size;
     return result;
 }
