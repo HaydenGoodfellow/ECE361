@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/time.h>    
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -65,14 +66,21 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Failed to get address info: %s\n", gai_strerror(getAddrReturn));
         return 0;
     }
+    // Timer variables to measure RTT
+    struct timeval send, recv;
     // Send info to server
     char ftp[] = "ftp";
+    gettimeofday(&send, NULL);
     sendto(sockfd, ftp, strlen(ftp), MSG_CONFIRM, serverInfo->ai_addr, serverInfo->ai_addrlen);
     // Receive info back from server
     char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
     socklen_t serverAddrLen = sizeof(struct sockaddr);
     recvfrom(sockfd, input, MAX_SOCKET_INPUT_SIZE, MSG_WAITALL | MSG_TRUNC,
              (struct sockaddr *)&server, &serverAddrLen);
+    gettimeofday(&recv, NULL);
+    double rtt = (recv.tv_sec - send.tv_sec) * 1000 * 1000; // us
+    rtt += ((recv.tv_usec - send.tv_usec)); // us
+    printf("RTT is %.0f us\n", rtt);
     if (strncmp(input, "yes", 3) == 0) 
         printf("A file transfer can start\n");
     else
