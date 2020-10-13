@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <assert.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -104,10 +105,41 @@ void receiveFile(int sockfd, struct sockaddr_in *client, socklen_t *clientAddrLe
              (struct sockaddr *)client, clientAddrLen);
     fprintf(stderr, "Packet received over socket\n");
     Packet packet = stringToPacket(input);
-    int fd = creat("./test2.txt", S_IRWXU);
+    assert(packet.fragNum == 1);
+    int fd = creat(packet.filename, S_IRWXU);
+    assert(fd >= 0);
+    // Write contents to file
     int writeReturn = write(fd, packet.filedata, packet.size);
     if (writeReturn < 0)
-        fprintf(stderr, "Error writing to new file\n");
+        fprintf(stderr, "Error writing packet %u to new file\n", packet.fragNum);
+    // Acknowledge the packet
+    char *ack = (char *)malloc(sizeof(char) * 1028);
+    strcpy(ack, "ACK2");
+    int sendRet = sendto(sockfd, ack, strlen(ack), MSG_CONFIRM, (struct sockaddr *)client, *clientAddrLen);
+    if (sendRet < 0)
+        perror("Error");
+    fprintf(stderr, "Sent %s\n", ack);
+    // If there was only one packet we're done
+    if (packet.totalFragments == 1)
+        return;
+    // Else get all packets, acknowledge them, and write their contents to the new file
+    for (unsigned lastPackNum = 1; lastPackNum < packet.totalFragments; ++lastPackNum) {
+        recvfrom(sockfd, input, MAX_PACKET_INPUT_SIZE, MSG_TRUNC, 
+             (struct sockaddr *)client, clientAddrLen);
+        fprintf(stderr, "Packet received over socket\n");
+        Packet packet = stringToPacket(input);
+        assert(packet.fragNum == (lastPackNum + 1));
+        // Write contents to file
+        writeReturn = write(fd, packet.filedata, packet.size);
+        if (writeReturn < 0)
+            fprintf(stderr, "Error writing packet %u to new file\n", lastPackNum);
+        // Acknowledge the packet
+        sprintf(ack, "ACK%u", packet.fragNum + 1);
+        int sendRet = sendto(sockfd, ack, strlen(ack), MSG_CONFIRM, (struct sockaddr *)client, *clientAddrLen);
+        if (sendRet < 0)
+            perror("Error");
+        fprintf(stderr, "Sent %s\n", ack);
+    }
 }
 
 // Converts string we received over socket into packet
