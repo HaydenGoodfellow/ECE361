@@ -96,6 +96,7 @@ int main(int argc, char **argv) {
         // Reply with "no"
         sendto(sockfd, no, strlen(no), MSG_CONFIRM, (struct sockaddr *)&client, clientAddrLen);
     }
+    free(input);
     close(sockfd);
     return 0;
 }
@@ -122,8 +123,11 @@ void receiveFile(int sockfd, struct sockaddr_in *client, socklen_t *clientAddrLe
         perror("Error");
     fprintf(stderr, "Sent %s\n", ack);
     // If there was only one packet we're done
-    if (packet.totalFragments == 1)
+    if (packet.totalFragments == 1) {
+        free(input);
+        close(fd);
         return;
+    }
     // Change socket to one second timeout so we can send NACK if we don't receive a packet in time
     struct timeval t;
     t.tv_sec = 1;
@@ -161,6 +165,8 @@ void receiveFile(int sockfd, struct sockaddr_in *client, socklen_t *clientAddrLe
             perror("Error");
         fprintf(stderr, "Sent %s\n", ack);
     }
+    free(input);
+    close(fd);
 }
 
 // Converts string we received over socket into packet

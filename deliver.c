@@ -95,6 +95,8 @@ int main(int argc, char **argv) {
     }
     else
         fprintf(stderr, "Response from server not \"yes\"");
+    free(input);
+    close(sockfd);
     return 0;
 }
 
@@ -134,8 +136,9 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
             perror("Error");
         // Wait for acknowledgement from server
         bool ackRecvied = false;
+        char *input;
         while (!ackRecvied) {
-            char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
+            input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
             recv(sockfd, input, MAX_SOCKET_INPUT_SIZE, MSG_TRUNC);
             if (strncmp(input, "ACK", 3) == 0) 
                 ackRecvied = true; 
@@ -147,7 +150,10 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
                     perror("Error");
             }
         }
+        free(packetAsString);
+        free(input);
     }
+    close(srcFile);
 }
 
 // Currently assuming the file is in our current working directory
