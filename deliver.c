@@ -115,6 +115,13 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
     long fileSize = getFileSize(srcFile);
     unsigned totalNumFragments = (unsigned) ceil(((double) fileSize) / 1000.0);
     fprintf(stderr, "Total number of fragments: %u\n", totalNumFragments);
+    // Sets the timeout
+    struct timeval t;
+    t.tv_sec = 1;
+    t.tv_usec = 0;
+    int sockOptRet = setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &t, sizeof(t));
+    if (sockOptRet < 0) 
+        perror("Error");
     // Send fragments one by one
     for (int fragNum = 1; fragNum <= totalNumFragments; ++fragNum) {
         fprintf(stderr, "fragNum: %d\n", fragNum);
@@ -139,7 +146,11 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
         char *input;
         while (!ackRecvied) {
             input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
-            recv(sockfd, input, MAX_SOCKET_INPUT_SIZE, MSG_TRUNC);
+            int status = recv(sockfd, input, MAX_SOCKET_INPUT_SIZE, MSG_TRUNC);
+            if (status == -1 && errno == EAGAIN){
+                printf("Timeout: resending the packet");
+                sendto(sockfd, packetAsString, strLength, 0, serverInfo->ai_addr, serverInfo->ai_addrlen);
+            }
             if (strncmp(input, "ACK", 3) == 0) 
                 ackRecvied = true; 
             // Packet not received so send again
