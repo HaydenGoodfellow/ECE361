@@ -160,9 +160,9 @@ void receiveFile(int sockfd, struct sockaddr_in *client, socklen_t *clientAddrLe
             fprintf(stderr, "Error writing packet %u to new file\n", lastPackNum);
         // Acknowledge the packet
         sprintf(ack, "ACK%u", packet.fragNum + 1);
-        int sendRet = sendto(sockfd, ack, strlen(ack), MSG_CONFIRM, (struct sockaddr *)client, *clientAddrLen);
-        if (sendRet < 0)
-            perror("Error");
+        // int sendRet = sendto(sockfd, ack, strlen(ack), MSG_CONFIRM, (struct sockaddr *)client, *clientAddrLen);
+        // if (sendRet < 0)
+        //     perror("Error");
         fprintf(stderr, "Sent %s\n", ack);
     }
     free(input);
