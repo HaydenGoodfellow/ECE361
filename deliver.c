@@ -149,7 +149,7 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
         while (!ackRecvied) {
             input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
             int status = recv(sockfd, input, MAX_SOCKET_INPUT_SIZE, 0);
-            if (status < 0 && errno == EAGAIN){
+            if (status < 0 && errno == EAGAIN) {
                 ++sendAttempt;
                 fprintf(stderr, "Timeout: resending the packet\n");
                 sendto(sockfd, packetAsString, strLength, 0, serverInfo->ai_addr, serverInfo->ai_addrlen);
