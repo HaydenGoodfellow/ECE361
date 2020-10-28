@@ -22,8 +22,9 @@
 
 #define MAX_USER_INPUT_SIZE 128 // Chars
 #define MAX_SOCKET_INPUT_SIZE 128 // Bytes
+#define TIMEOUT 200 // ms
 
-void transferFile(int sockfd, char *filename, struct addrinfo *serverInfo);
+void transferFile(int sockfd, char *filename, struct addrinfo *serverInfo, double rtt);
 char *packetToString(Packet pk, unsigned *size);
 bool fileExists(char *name);
 off_t getFileSize(int fd);
@@ -91,7 +92,7 @@ int main(int argc, char **argv) {
     printf("RTT is %.0f us\n", rtt);
     if (strncmp(input, "yes", 3) == 0) {
         printf("A file transfer can start\n");
-        transferFile(sockfd, userInput + 4, serverInfo);
+        transferFile(sockfd, userInput + 4, serverInfo, rtt);
     }
     else
         fprintf(stderr, "Response from server not \"yes\"");
@@ -101,7 +102,7 @@ int main(int argc, char **argv) {
 }
 
 // Transfer a file to server over socket sockfd
-void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
+void transferFile(int sockfd, char *name, struct addrinfo *serverInfo, double rtt) {
     // Get proper pathname to file by stripping whitespaces
     char *end = name + strlen(name) - 1;
     while ((end > name) && isspace((unsigned char)*end))
@@ -115,6 +116,15 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
     long fileSize = getFileSize(srcFile);
     unsigned totalNumFragments = (unsigned) ceil(((double) fileSize) / 1000.0);
     fprintf(stderr, "Total number of fragments: %u\n", totalNumFragments);
+    // Sets the timeout
+    double estRTT = rtt;
+    double devRTT = 0;
+    struct timeval t;
+    t.tv_sec = 0;
+    t.tv_usec = rtt;
+    int sockOptRet = setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &t, sizeof(t));
+    if (sockOptRet < 0) 
+        perror("Error");
     // Send fragments one by one
     for (int fragNum = 1; fragNum <= totalNumFragments; ++fragNum) {
         fprintf(stderr, "fragNum: %d\n", fragNum);
@@ -130,16 +140,29 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
         memcpy(packet.filedata, buf, readReturn);
         unsigned strLength;
         char *packetAsString = packetToString(packet, &strLength);
+        struct timeval send, recvT;
+        gettimeofday(&send, NULL);
         // Convert packet to string and send to server
         int sendRet = sendto(sockfd, packetAsString, strLength, 0, serverInfo->ai_addr, serverInfo->ai_addrlen);
         if (sendRet < 0)
             perror("Error");
         // Wait for acknowledgement from server
         bool ackRecvied = false;
+        int sendAttempt = 1;
         char *input;
         while (!ackRecvied) {
             input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
-            recv(sockfd, input, MAX_SOCKET_INPUT_SIZE, MSG_TRUNC);
+            int status = recv(sockfd, input, MAX_SOCKET_INPUT_SIZE, 0);
+            gettimeofday(&recvT, NULL);
+            double rtt = (recvT.tv_sec - send.tv_sec) * 1000 * 1000; // us
+            rtt += ((recvT.tv_usec - send.tv_usec)); // us
+            estRTT = (0.875 * estRTT) + (0.125 * rtt);
+            devRTT = (0.75 * devRTT) + (0.25 * abs(rtt - estRTT));
+            if (status < 0 && errno == EAGAIN) {
+                ++sendAttempt;
+                fprintf(stderr, "Timeout: resending the packet\n");
+                sendto(sockfd, packetAsString, strLength, 0, serverInfo->ai_addr, serverInfo->ai_addrlen);
+            }
             if (strncmp(input, "ACK", 3) == 0) 
                 ackRecvied = true; 
             // Packet not received so send again
@@ -149,6 +172,18 @@ void transferFile(int sockfd, char *name, struct addrinfo *serverInfo) {
                 if (sendRet < 0)
                     perror("Error");
             }
+            if (sendAttempt > 100) {
+                fprintf(stderr, "Error sending file. 100 Packets sent without response. Closing connection\n");
+                free(packetAsString);
+                free(input);
+                close(srcFile);
+                exit(0);
+            }
+            // Update timeout interval
+            struct timeval tn;
+            tn.tv_sec = 0;
+            tn.tv_usec = (estRTT + 4*devRTT);
+            setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tn, sizeof(tn));
         }
         free(packetAsString);
         free(input);
