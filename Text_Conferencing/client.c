@@ -35,13 +35,14 @@ const char* quit_cmd = "/quit";
 
 int main(int argc, char* argv[]){
     fd_set fd;
+    int sockfd = -1;
     while(1){
-        get_cmd();
+        get_cmd(&sockfd);
     }
     return 0;
 }
 
-int get_cmd(){
+int get_cmd(int* sockfd){
     char input[MAX_USER_INPUT_SIZE];
     int err = 0;
     
@@ -52,10 +53,10 @@ int get_cmd(){
         char server_ip[MAX_USER_INPUT_SIZE];
         char server_port[MAX_USER_INPUT_SIZE];
         scanf(" %s %s %s %s", user_name, user_pwd, server_ip, server_port);
-        login(user_name, user_pwd, server_ip, server_port);
+        login(user_name, user_pwd, server_ip, server_port, sockfd);
     }
     else if(strcmp(input, logout_cmd) == 0){
-        logout();
+        logout(sockfd);
     }
     else if(strcmp(input, join_session_cmd) == 0){
         join_session();
@@ -75,11 +76,10 @@ int get_cmd(){
     return err;
 }
 
-void login(const char* name, const char* pass, const char* server_ip, const char* server_port){
+void login(const char* name, const char* pass, const char* server_ip, const char* server_port, int* sockfd){
     printf("login\n");
     // create socket
     struct addrinfo hints, *serverInfo;
-    int sockfd;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET; // Ensures IPv4
     hints.ai_socktype = SOCK_STREAM; // Ensures TCP
@@ -95,12 +95,12 @@ void login(const char* name, const char* pass, const char* server_ip, const char
     }
     struct addrinfo* i;
     for ( i = serverInfo; i!= NULL; i = i->ai_next){
-        sockfd = socket(i->ai_family, i->ai_socktype, i->ai_protocol);
-        if (sockfd == -1){
+        *sockfd = socket(i->ai_family, i->ai_socktype, i->ai_protocol);
+        if (*sockfd == -1){
             continue;
         }
-        if (connect(sockfd, i->ai_addr, i->ai_addrlen) == -1){
-            close(sockfd);
+        if (connect(*sockfd, i->ai_addr, i->ai_addrlen) == -1){
+            close(*sockfd);
             continue;
         }
         break;
@@ -110,12 +110,18 @@ void login(const char* name, const char* pass, const char* server_ip, const char
         printf("client: fail to login");
         return;
     }
-    // create and send packet to server, indicating login
+    // *******create and send packet to server, indicating login
     
     return;
 }
-void logout(){
+void logout(int* sockfd){
     printf("logout\n");
+    if (*sockfd == -1){
+        printf("client: fail to logout");
+    }
+    // *******create and send packet to server, indicating logout
+    close(*sockfd);
+    *sockfd = -1;
     return;
 }
 void join_session(){
