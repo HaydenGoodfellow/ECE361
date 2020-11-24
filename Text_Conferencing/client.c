@@ -36,13 +36,15 @@ const char* quit_cmd = "/quit";
 int main(int argc, char* argv[]){
     fd_set fd;
     int sockfd = -1;
+    char session[MAX_USER_INPUT_SIZE];
+    bool in_session = false;
     while(1){
-        get_cmd(&sockfd);
+        get_cmd(&sockfd, session, &in_session);
     }
     return 0;
 }
 
-int get_cmd(int* sockfd){
+int get_cmd(int* sockfd, char* session, bool* in_session){
     char input[MAX_USER_INPUT_SIZE];
     int err = 0;
     
@@ -59,10 +61,13 @@ int get_cmd(int* sockfd){
         logout(sockfd);
     }
     else if(strcmp(input, join_session_cmd) == 0){
-        join_session();
+        char session_name[MAX_USER_INPUT_SIZE];
+        scanf("%s", session_name);
+        strncpy(session, session_name, strlen(session_name));
+        join_session(session, sockfd, in_session);
     }
     else if((strcmp(input, leave_session_cmd) == 0)){
-        leave_session();
+        leave_session(session, sockfd, in_session);
     }
     else if((strcmp(input, create_session_cmd) == 0)){
         create_session();
@@ -107,7 +112,7 @@ void login(const char* name, const char* pass, const char* server_ip, const char
     }
     // check if client is connected
     if (i == NULL){
-        printf("client: fail to login");
+        printf("client: fail to login\n");
         return;
     }
     // *******create and send packet to server, indicating login
@@ -117,19 +122,36 @@ void login(const char* name, const char* pass, const char* server_ip, const char
 void logout(int* sockfd){
     printf("logout\n");
     if (*sockfd == -1){
-        printf("client: fail to logout");
+        printf("client: fail to logout\n");
+        return;
     }
     // *******create and send packet to server, indicating logout
     close(*sockfd);
     *sockfd = -1;
     return;
 }
-void join_session(){
+void join_session(const char* session, int* sockfd, bool* in_session){
     printf("join session\n");
+    if (*sockfd == -1){
+        printf("client: fail to join session\n");
+        return;
+    }
+    // *******create and send packet to server, indicating join session
+    *in_session = true;
     return;
 }
-void leave_session(){
+void leave_session(const char* session, int* sockfd, bool* in_session){
     printf("leave session\n");
+    if (*in_session == false){
+        printf("client: fail to leave session2\n");
+        return;
+    }
+    if (*sockfd == -1){
+        printf("client: fail to leave session1\n");
+        return;
+    }
+    // *******create and send packet to server, indicating leave session
+    *in_session = false;
     return;
 }
 void create_session(){
