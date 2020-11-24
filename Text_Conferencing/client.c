@@ -21,6 +21,8 @@
 #include "client.h"
 
 #define MAX_USER_INPUT_SIZE 128 // Chars
+#define MAX_USER_NAME 128
+#define MAX_USER_PWD 128
 
 // commands
 const char* login_cmd = "/login";
@@ -45,7 +47,12 @@ int get_cmd(){
     
     scanf("%s", input);
     if (strcmp(input, login_cmd) == 0){
-        login();
+        char user_name[MAX_USER_NAME];
+        char user_pwd[MAX_USER_PWD];
+        char server_ip[MAX_USER_INPUT_SIZE];
+        char server_port[MAX_USER_INPUT_SIZE];
+        scanf(" %s %s %s %s", user_name, user_pwd, server_ip, server_port);
+        login(user_name, user_pwd, server_ip, server_port);
     }
     else if(strcmp(input, logout_cmd) == 0){
         logout();
@@ -68,8 +75,43 @@ int get_cmd(){
     return err;
 }
 
-void login(){
+void login(const char* name, const char* pass, const char* server_ip, const char* server_port){
     printf("login\n");
+    // create socket
+    struct addrinfo hints, *serverInfo;
+    int sockfd;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET; // Ensures IPv4
+    hints.ai_socktype = SOCK_STREAM; // Ensures TCP
+    printf("name: %s\n", name);
+    printf("pass: %s\n", pass);
+    printf("server ip: %s\n", server_ip);
+    printf("server port: %s\n", server_port);
+    // Get address info
+    int getAddrReturn = getaddrinfo(server_ip, server_port, &hints, &serverInfo);
+    if (getAddrReturn != 0) {
+        fprintf(stderr, "Failed to get address info: %s\n", gai_strerror(getAddrReturn));
+        return;
+    }
+    struct addrinfo* i;
+    for ( i = serverInfo; i!= NULL; i = i->ai_next){
+        sockfd = socket(i->ai_family, i->ai_socktype, i->ai_protocol);
+        if (sockfd == -1){
+            continue;
+        }
+        if (connect(sockfd, i->ai_addr, i->ai_addrlen) == -1){
+            close(sockfd);
+            continue;
+        }
+        break;
+    }
+    // check if client is connected
+    if (i == NULL){
+        printf("client: fail to login");
+        return;
+    }
+    // create and send packet to server, indicating login
+    
     return;
 }
 void logout(){
