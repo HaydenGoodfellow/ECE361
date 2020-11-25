@@ -4,7 +4,7 @@
 // Found online at: https://beej.us/guide/bgnet/html/
 
 session sList[64]; // Session List
-int numSessions;
+unsigned numSessions;
 
 int main(int argc, char **argv) {
 	if (argc < 2 || (atoi(argv[1]) <= 0)) {
@@ -56,6 +56,8 @@ int main(int argc, char **argv) {
         perror("Listen error");
         exit(0);
     }
+    sList[0].sessionName = malloc(sizeof(char) * strlen("No Session"));
+    strcpy(sList[0].sessionName, "No Session");
     // Set up fd we will poll and accept other fds from
     struct pollfd fds[1];
     memset(fds, 0, sizeof(fds));
@@ -99,11 +101,11 @@ void *pollMetaSession() {
             if (sList[0].clientFds[i].revents & POLLIN) {
                 fprintf(stderr, "Received data from client: %d\n", i);
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
-                int numBytes = recv(sList[sNum].clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
+                recv(sList[0].clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
                 fprintf(stderr, "Received data: %s\n", input);
                 message *msg = parseMessageAsString(input);
                 if (msg->type == MESSAGE) {
-                    sendResponse("You can't send messages until you create or join a session!\n", 0, i);
+                    sendResponse(MESSAGE_NACK, "You can't send messages until you create or join a session!\n", 0, i);
                     continue;
                 }
                 else {
@@ -115,7 +117,8 @@ void *pollMetaSession() {
     return NULL;
 }
 
-void *pollSession(unsigned sNum /*Session number*/) {
+void *pollSession(void *sessionNum /*Session number*/) {
+    unsigned sNum = *((int *)sessionNum);
     fprintf(stderr, "In thread for session: %d\n", sNum);
     while (true) {
         int pollRet = poll(sList[sNum].clientFds, sList[sNum].numClients, 500); // Blocks, may change to timeout
@@ -128,11 +131,12 @@ void *pollSession(unsigned sNum /*Session number*/) {
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
                 int numBytes = recv(sList[sNum].clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
                 fprintf(stderr, "Received data: %s\n", input);
-                for (int j = 0; j < sList[sNum].numClients; ++j) {
-                    if (i == j)
-                        continue;
-                    fprintf(stderr, "Sending data: %s\n", input);
-                    send(sList[sNum].clientFds[j].fd, input, numBytes, 0);
+                message *msg = parseMessageAsString(input);
+                if (msg->type == MESSAGE) {
+                    broadcastMessage(input, numBytes, sNum, i);
+                }
+                else {
+                    performCommand(msg, 0, i);
                 }
             }
         }
@@ -213,6 +217,7 @@ void performCommand(message *msg, unsigned sNum, unsigned clientNum) {
                 sList[sNum].clients[clientNum].password = NULL;
                 // Mark as logged in
                 sList[sNum].clients[clientNum].loggedIn = false;
+                removeClientFromSession(sNum, clientNum);
                 // Send login acknowledgement
                 sendResponse(LOGOUT_ACK, "", sNum, clientNum);
             }
@@ -226,22 +231,98 @@ void performCommand(message *msg, unsigned sNum, unsigned clientNum) {
                 sList[numSessions].sessionNum = numSessions;
                 sList[numSessions].clientFds[0].fd = sList[0].clientFds[clientNum].fd;
                 sList[numSessions].clientFds[0].events = POLLIN;
-                
+                sList[numSessions].clients[0].name = sList[0].clients[clientNum].name;
+                sList[numSessions].clients[0].password = sList[0].clients[clientNum].password;
+                sendResponse(NEW_SESS_ACK, "", sNum, clientNum);
+                removeClientFromSession(0, clientNum);
+                pthread_create((pthread_t *) sList[numSessions].thread, NULL, (void *) pollSession, (void *) &numSessions);
+            }
+            else if (sNum != 0) {
+                sendResponse(NEW_SESS_NACK, "Can't create new session while in a session!\n", sNum, clientNum);
+            }
+            else {
+                sendResponse(NEW_SESS_NACK, "Too many sessions already exist!\n", sNum, clientNum);
             }
             break;
         case JOIN_SESS:
+            if (sNum != 0) {
+                sendResponse(JOIN_SESS_NACK, "Can't join another session while in a session!\n", sNum, clientNum);
+                return;
+            }
+            unsigned sessionNum = 0;
+            for (int i = 1; i < numSessions; ++i) {
+                if (strcmp(sList[i].sessionName, msg->data) == 0) {
+                    sessionNum = i;
+                    break;
+                }
+            }
+            if (sessionNum == 0) {
+                sendResponse(JOIN_SESS_NACK, "Session with that name not found!\n", sNum, clientNum);
+                return;
+            }
+            unsigned numClients = sList[sessionNum].numClients;
+            sList[sessionNum].clientFds[numClients].fd = sList[0].clientFds[clientNum].fd;
+            sList[sessionNum].clientFds[numClients].events = POLLIN;
+            sList[sessionNum].clients[numClients].name = sList[0].clients[clientNum].name;
+            sList[sessionNum].clients[numClients].password = sList[0].clients[clientNum].password;
+            sendResponse(JOIN_SESS_ACK, "", sNum, clientNum);
+            removeClientFromSession(0, clientNum);
+            --sList[0].numClients;
+            ++sList[sessionNum].numClients;
             break;
         case LEAVE_SESS:
+            if (sNum == 0) {
+                sendResponse(LEAVE_SESS_NACK, "You're not in a session to leave!\n", sNum, clientNum);
+                return;
+            }
+            numClients = sList[0].numClients;
+            sList[0].clientFds[numClients].fd = sList[sNum].clientFds[clientNum].fd;
+            sList[0].clientFds[numClients].events = POLLIN;
+            sList[0].clients[numClients].name = sList[sNum].clients[clientNum].name;
+            sList[0].clients[numClients].password = sList[sNum].clients[clientNum].password;
+            sendResponse(LEAVE_SESS_ACK, "", sNum, clientNum);
+            removeClientFromSession(sNum, clientNum);
+            ++sList[0].numClients;
+            --sList[sNum].numClients;
             break;
-        case QUERY:
+        case QUERY: ;
+            char result[2048];
+            for (int i = 0; i < numSessions; ++i) {
+                int strLength = 0; 
+                char sessionInfo[512];
+                strLength += sprintf(sessionInfo, "Session: %s\nUsers: \n", sList[i].sessionName);
+                for (int j = 0; j < sList[i].numClients; ++j) {
+                    strLength += sprintf(sessionInfo + strLength, "%s\n", sList[i].clients[j].name);
+                }
+                strcat(result, sessionInfo);
+            }
+            sendResponse(QUERY_ACK, result, sNum, clientNum);
             break;
         case EXIT:
+            removeClientFromSession(sNum, clientNum);
             break;
         default:
             break;
     }
 }
 
-void sendResponse(char *response, unsigned sNum, unsigned clientNum) {
+void sendResponse(messageTypes type, char *response, unsigned sNum, unsigned clientNum) {
+    message *msg = malloc(sizeof(message));
+    msg->type = type;
+    msg->size = strlen(response);
+    strcpy(msg->source, "Server");
+    strcpy(msg->data, response);
+    unsigned strLength;
+    char *msgAsString = messageToString(msg, &strLength);
+    send(sList[sNum].clientFds[clientNum].fd, msgAsString, strLength, 0);
+}
 
+void removeClientFromSession(unsigned sNum, unsigned clientNum) {
+    unsigned numClients = sList[sNum].numClients;
+    for (unsigned i = clientNum; i < numClients - 1; ++i) {
+        sList[sNum].clientFds[i].fd = sList[sNum].clientFds[i + 1].fd;
+        sList[sNum].clientFds[i].fd = sList[sNum].clientFds[i + 1].fd;
+        sList[sNum].clients[i].name = sList[sNum].clients[i + 1].name;
+        sList[sNum].clients[i].password = sList[sNum].clients[i + 1].password;
+    }
 }

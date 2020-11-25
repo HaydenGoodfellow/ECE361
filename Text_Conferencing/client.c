@@ -138,7 +138,6 @@ message *parseInput(char *input) {
             return msg;
         }
         else if (strncmp(input + 1, "logout", 6) == 0) {
-            strcpy(username, clientID);
             msg->type = LOGOUT;
             msg->size = 0;
             strcpy(msg->source, username);
@@ -171,14 +170,12 @@ message *parseInput(char *input) {
             return msg;
         }
         else if (strncmp(input + 1, "leavesession", 12) == 0) {
-            strcpy(username, clientID);
             msg->type = LEAVE_SESS;
             msg->size = 0;
             strcpy(msg->source, username);
             return msg;
         }
         else if (strncmp(input + 1, "list", 4) == 0) {
-            strcpy(username, clientID);
             msg->type = QUERY;
             msg->size = 0;
             strcpy(msg->source, username);
