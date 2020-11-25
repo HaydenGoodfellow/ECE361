@@ -107,12 +107,14 @@ void *getResponse(void *sockfd) {
         // Receive message back from server
         int bytesRecv = recv(*((int *)sockfd), response, MAX_SOCKET_INPUT_SIZE, 0);
         response[bytesRecv] = '\0';
+        message *msg = parseMessageAsString(response);
+        evaluateResponse(msg);
         fprintf(stderr, "%s\n", response);
     }
 }
 
 message *parseInput(char *input) {
-    static char username[64]; // 64 characters max size for name
+    static char username[64];
     // Check if input is null
     if (input == NULL) {
         fprintf(stderr, "Invalid input!\n");
@@ -122,7 +124,7 @@ message *parseInput(char *input) {
     if (strncmp(input, "/", 1) == 0) { // Command
         if (strncmp(input + 1, "login ", 6) == 0) {
             char *command = strtok(input, " ");
-            char *clientID = strtok(NULL, " ");
+            char* clientID = strtok(NULL, " ");
             char *password = strtok(NULL, " ");
             char *serverIP = strtok(NULL, " ");
             char *port = strtok(NULL, " ");
@@ -212,4 +214,57 @@ char *messageToString(message *msg, unsigned *size) {
     fprintf(stderr, "\nLength: %d\n", bytesPrinted + msg->size);
     *size = bytesPrinted + msg->size;
     return result;
+}
+
+message *parseMessageAsString(char *input) {
+    char *type = strtok(input, ":");
+    char *size = strtok(NULL, ":");
+    char *source = strtok(NULL, ":");
+    unsigned dataIndex = 3 + strlen(type) + strlen(size) + strlen(source);
+    message *msg = malloc(sizeof(message));
+    msg->type = atoi(type);
+    msg->size = atoi(size);
+    strcpy(msg->source, source);
+    strncpy(msg->data, input + dataIndex, msg->size);
+    return msg;
+}
+
+void evaluateResponse(message* msg){
+    switch (msg->type) {
+        case MESSAGE_NACK:
+            fprintf(stderr, msg->data);
+            break;
+        case LOGIN_ACK:
+            fprintf(stdout, "login successful.\n");
+            break;
+        case LOGIN_NACK:
+            fprintf(stderr, msg->data);
+            break;
+        case LOGOUT_ACK:
+            fprintf(stdout, "logout successful.\n");
+            break;
+        case LOGOUT_NACK:
+            fprintf(stderr, msg->data);
+            break;
+        case NEW_SESS_ACK:
+            fprintf(stdout, "session created successful.\n");
+            break;
+        case JOIN_SESS_ACK:
+            fprintf(stdout, "join session successful.\n");
+            break;
+        case JOIN_SESS_NACK:
+            fprintf(stderr, msg->data);
+            break;
+        case QUERY_ACK:
+            fprintf(stdout, msg->data);
+            break;
+        case LEAVE_SESS_ACK:
+            fprintf(stdout, "leave session successful.\n");
+            break;
+        case LEAVE_SESS_NACK:
+            fprintf(stderr, msg->data);
+            break;
+        default:
+            break;
+    }
 }
