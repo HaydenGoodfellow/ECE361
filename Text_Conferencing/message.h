@@ -3,19 +3,23 @@
 
 typedef enum messageTypes {
     MESSAGE = 0,
+    MESSAGE_NACK,
     LOGIN,
     LOGIN_ACK,
-    LOGIN_NAK,
+    LOGIN_NACK,
     LOGOUT,
     LOGOUT_ACK,
     LOGOUT_NACK,
     EXIT,
     NEW_SESS,
     NEW_SESS_ACK,
+    NEW_SESS_NACK,
     JOIN_SESS,
     JOIN_SESS_ACK,
     JOIN_SESS_NACK,
     LEAVE_SESS,
+    LEAVE_SESS_ACK,
+    LEAVE_SESS_NACK,
     QUERY,
     QUERY_ACK
 } messageTypes;

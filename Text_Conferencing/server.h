@@ -36,15 +36,16 @@ typedef struct session {
 // Session 0 (meta session) is for users who are not in a session and it only accepts commands
 void *pollMetaSession();
 
-void *pollSession(unsigned sessionNum);
+void *pollSession(void *sessionNum);
 
 message *parseMessageAsString(char *input);
 
 char *messageToString(message *msg, unsigned *size);
 
-void broadcastMessage(message *msg, unsigned sNum, unsigned clientNum);
+void broadcastMessage(char *messageAsString, unsigned strLength, unsigned sNum, unsigned clientNum);
 
 void performCommand(message *msg, unsigned sNum, unsigned clientNum);
 
 void sendResponse(messageTypes type, char *response, unsigned sNum, unsigned clientNum);
 
+void removeClientFromSession(unsigned sNum, unsigned clientNum);
