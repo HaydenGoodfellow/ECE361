@@ -24,3 +24,5 @@ void *getResponse(void *sockfd);
 message *parseInput(char *input);
 
 char *messageToString(message *msg, unsigned *size);
+message *parseMessageAsString(char *input);
+void evaluateResponse(message* msg);
