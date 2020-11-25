@@ -91,6 +91,8 @@ int main(int argc, char **argv) {
         }
         // Convert to message type and make string
         msg = parseInput(userInput);
+        if (msg == NULL)
+            continue;
         strLength = 0;
         msgAsString = messageToString(msg, &strLength);
         // Send message to server
@@ -108,8 +110,8 @@ void *getResponse(void *sockfd) {
         int bytesRecv = recv(*((int *)sockfd), response, MAX_SOCKET_INPUT_SIZE, 0);
         response[bytesRecv] = '\0';
         message *msg = parseMessageAsString(response);
-        if (msg->type == MESSAGE){
-            fprintf(stderr, "Message source: %s\n Data: %s\n", msg->source, msg->data);
+        if (msg->type == MESSAGE) {
+            fprintf(stderr, "%s: %s\n", msg->source, msg->data);
         }
         else{
             evaluateResponse(msg);
@@ -191,6 +193,10 @@ message *parseInput(char *input) {
         else if (strncmp(input + 1, "quit", 4) == 0) {
             exit(0);
         }
+        else {
+            fprintf(stderr, "Invalid command\n");
+            return NULL;
+        }
     }
     else  { // Message
         msg->type = MESSAGE;
@@ -262,7 +268,7 @@ void evaluateResponse(message* msg) {
             fprintf(stderr, "%s\n", msg->data);
             break;
         case QUERY_ACK:
-            fprintf(stderr, "%s\n", msg->data);
+            fprintf(stderr, "%s", msg->data);
             break;
         case LEAVE_SESS_ACK:
             fprintf(stderr, "Leave session successful.\n");

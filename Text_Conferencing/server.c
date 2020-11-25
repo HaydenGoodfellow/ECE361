@@ -127,14 +127,17 @@ void *pollSession(void *sessionNum /*Session number*/) {
         for (int i = 0; i < sList[sNum].numClients; ++i) {
             if (sList[sNum].clientFds[i].revents & POLLIN) {
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
-                int numBytes = recv(sList[sNum].clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
+                recv(sList[sNum].clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
                 fprintf(stderr, "Received data from client: %d data: %s\n", i, input);
                 message *msg = parseMessageAsString(input);
                 if (msg->type == MESSAGE) {
-                    broadcastMessage(input, numBytes, sNum, i);
+                    unsigned strLength = 0;
+                    char *output = messageToString(msg, &strLength);
+                    fprintf(stderr, "Broadcasting message: %s\n", output);
+                    broadcastMessage(output, strLength, sNum, i);
                 }
                 else {
-                    performCommand(msg, 0, i);
+                    performCommand(msg, sNum, i);
                 }
             }
         }
@@ -195,7 +198,7 @@ void performCommand(message *msg, unsigned sNum, unsigned clientNum) {
                 strcpy(sList[sNum].clients[clientNum].name, msg->source);
                 // Save password
                 sList[sNum].clients[clientNum].password = malloc(sizeof(char) * msg->size);
-                strncpy(sList[sNum].clients[clientNum].name, msg->data, msg->size);
+                strncpy(sList[sNum].clients[clientNum].password, msg->data, msg->size);
                 // Mark as logged in
                 sList[sNum].clients[clientNum].loggedIn = true;
                 // Send login acknowledgement
@@ -326,7 +329,7 @@ void removeClientFromSession(unsigned sNum, unsigned clientNum) {
     unsigned numClients = sList[sNum].numClients;
     for (unsigned i = clientNum; i < numClients - 1; ++i) {
         sList[sNum].clientFds[i].fd = sList[sNum].clientFds[i + 1].fd;
-        sList[sNum].clientFds[i].fd = sList[sNum].clientFds[i + 1].fd;
+        sList[sNum].clientFds[i].events = sList[sNum].clientFds[i + 1].events;
         sList[sNum].clients[i].name = sList[sNum].clients[i + 1].name;
         sList[sNum].clients[i].password = sList[sNum].clients[i + 1].password;
     }
