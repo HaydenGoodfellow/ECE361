@@ -232,37 +232,37 @@ message *parseMessageAsString(char *input) {
 void evaluateResponse(message* msg){
     switch (msg->type) {
         case MESSAGE_NACK:
-            fprintf(stderr, msg->data);
+            fprintf(stderr, "%s\n", msg->data);
             break;
         case LOGIN_ACK:
-            fprintf(stdout, "login successful.\n");
+            fprintf(stdout, "Login successful.\n");
             break;
         case LOGIN_NACK:
-            fprintf(stderr, msg->data);
+            fprintf(stderr, "%s\n", msg->data);
             break;
         case LOGOUT_ACK:
-            fprintf(stdout, "logout successful.\n");
+            fprintf(stdout, "Logout successful.\n");
             break;
         case LOGOUT_NACK:
-            fprintf(stderr, msg->data);
+            fprintf(stderr, "%s\n", msg->data);
             break;
         case NEW_SESS_ACK:
-            fprintf(stdout, "session created successful.\n");
+            fprintf(stdout, "Session created successful.\n");
             break;
         case JOIN_SESS_ACK:
-            fprintf(stdout, "join session successful.\n");
+            fprintf(stdout, "Join session successful.\n");
             break;
         case JOIN_SESS_NACK:
-            fprintf(stderr, msg->data);
+            fprintf(stderr, "%s\n", msg->data);
             break;
         case QUERY_ACK:
-            fprintf(stdout, msg->data);
+            fprintf(stderr, "%s\n", msg->data);
             break;
         case LEAVE_SESS_ACK:
-            fprintf(stdout, "leave session successful.\n");
+            fprintf(stdout, "Leave session successful.\n");
             break;
         case LEAVE_SESS_NACK:
-            fprintf(stderr, msg->data);
+            fprintf(stderr, "%s\n", msg->data);
             break;
         default:
             break;
