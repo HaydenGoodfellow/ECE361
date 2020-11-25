@@ -231,6 +231,9 @@ message *parseMessageAsString(char *input) {
 
 void evaluateResponse(message* msg){
     switch (msg->type) {
+        case MESSAGE_NACK:
+            fprintf(stderr, msg->data);
+            break;
         case LOGIN_ACK:
             fprintf(stdout, "login successful.\n");
             break;

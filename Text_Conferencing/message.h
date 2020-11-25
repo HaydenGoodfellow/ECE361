@@ -3,6 +3,7 @@
 
 typedef enum messageTypes {
     MESSAGE = 0,
+    MESSAGE_NACK,
     LOGIN,
     LOGIN_ACK,
     LOGIN_NACK,
