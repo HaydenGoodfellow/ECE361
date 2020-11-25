@@ -4,7 +4,7 @@
 // Found online at: https://beej.us/guide/bgnet/html/
 
 session sList[64]; // Session List
-unsigned numSessions;
+unsigned numSessions = 1;
 
 int main(int argc, char **argv) {
 	if (argc < 2 || (atoi(argv[1]) <= 0)) {
@@ -93,16 +93,15 @@ int main(int argc, char **argv) {
 // Session 0 (meta session) is for users who are not in a session and it only accepts commands
 void *pollMetaSession() {
     while (true) {
-        int pollRet = poll(sList[0].clientFds, sList[0].numClients, -1); // Blocks, may change to timeout
+        int pollRet = poll(sList[0].clientFds, sList[0].numClients, 500); // Blocks, may change to timeout
         if (pollRet == 0)
             continue;
         fprintf(stderr, "Received data on session 0 socket. Num clients: %d\n", sList[0].numClients);
         for (int i = 0; i < sList[0].numClients; ++i) {
             if (sList[0].clientFds[i].revents & POLLIN) {
-                fprintf(stderr, "Received data from client: %d\n", i);
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
                 recv(sList[0].clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
-                fprintf(stderr, "Received data: %s\n", input);
+                fprintf(stderr, "Received data from client: %d data: %s\n", i, input);
                 message *msg = parseMessageAsString(input);
                 if (msg->type == MESSAGE) {
                     sendResponse(MESSAGE_NACK, "You can't send messages until you create or join a session!\n", 0, i);
@@ -127,10 +126,9 @@ void *pollSession(void *sessionNum /*Session number*/) {
         fprintf(stderr, "Received data on session: %d socket. Num clients: %d\n", sNum, sList[sNum].numClients);
         for (int i = 0; i < sList[sNum].numClients; ++i) {
             if (sList[sNum].clientFds[i].revents & POLLIN) {
-                fprintf(stderr, "Received data from client: %d\n", i);
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
                 int numBytes = recv(sList[sNum].clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
-                fprintf(stderr, "Received data: %s\n", input);
+                fprintf(stderr, "Received data from client: %d data: %s\n", i, input);
                 message *msg = parseMessageAsString(input);
                 if (msg->type == MESSAGE) {
                     broadcastMessage(input, numBytes, sNum, i);
@@ -188,7 +186,7 @@ void broadcastMessage(char *messageAsString, unsigned strLength, unsigned sNum, 
 void performCommand(message *msg, unsigned sNum, unsigned clientNum) {
     switch (msg->type) {
         case MESSAGE:
-            fprintf(stderr, "Message of type message being sent to parse command\n");
+            fprintf(stderr, "Message of type message being sent to parse command");
             break;
         case LOGIN:
             if (!sList[sNum].clients[clientNum].loggedIn) { // Not logged in
@@ -204,7 +202,7 @@ void performCommand(message *msg, unsigned sNum, unsigned clientNum) {
                 sendResponse(LOGIN_ACK, "", sNum, clientNum);
             }
             else { // Already logged in
-                sendResponse(LOGIN_NACK, "Error: You are already logged in!\n", sNum, clientNum);
+                sendResponse(LOGIN_NACK, "Error: You are already logged in!", sNum, clientNum);
             }
             break;
         case LOGOUT:
@@ -222,11 +220,13 @@ void performCommand(message *msg, unsigned sNum, unsigned clientNum) {
                 sendResponse(LOGOUT_ACK, "", sNum, clientNum);
             }
             else { // Already logged out
-                sendResponse(LOGOUT_NACK, "Error: You are not logged in!\n", sNum, clientNum);
+                sendResponse(LOGOUT_NACK, "Error: You are not logged in!", sNum, clientNum);
             }
             break;
         case NEW_SESS:
+            fprintf(stderr, "Creating new session: %s\n", msg->data);
             if (numSessions < 63 && sNum == 0) {
+                sList[numSessions].sessionName = malloc(sizeof(char) * msg->size);
                 strcpy(sList[numSessions].sessionName, msg->data);
                 sList[numSessions].sessionNum = numSessions;
                 sList[numSessions].clientFds[0].fd = sList[0].clientFds[clientNum].fd;
@@ -235,18 +235,23 @@ void performCommand(message *msg, unsigned sNum, unsigned clientNum) {
                 sList[numSessions].clients[0].password = sList[0].clients[clientNum].password;
                 sendResponse(NEW_SESS_ACK, "", sNum, clientNum);
                 removeClientFromSession(0, clientNum);
-                pthread_create((pthread_t *) sList[numSessions].thread, NULL, (void *) pollSession, (void *) &numSessions);
+                --sList[0].numClients;
+                ++sList[numSessions].numClients;
+                sList[numSessions].thread = malloc(sizeof(pthread_t));
+                unsigned sessionNumCopy = numSessions;
+                pthread_create((pthread_t *) sList[numSessions].thread, NULL, (void *) pollSession, (void *) &sessionNumCopy);
+                ++numSessions;
             }
             else if (sNum != 0) {
-                sendResponse(NEW_SESS_NACK, "Can't create new session while in a session!\n", sNum, clientNum);
+                sendResponse(NEW_SESS_NACK, "Can't create new session while in a session!", sNum, clientNum);
             }
             else {
-                sendResponse(NEW_SESS_NACK, "Too many sessions already exist!\n", sNum, clientNum);
+                sendResponse(NEW_SESS_NACK, "Too many sessions already exist!", sNum, clientNum);
             }
             break;
         case JOIN_SESS:
             if (sNum != 0) {
-                sendResponse(JOIN_SESS_NACK, "Can't join another session while in a session!\n", sNum, clientNum);
+                sendResponse(JOIN_SESS_NACK, "Can't join another session while in a session!", sNum, clientNum);
                 return;
             }
             unsigned sessionNum = 0;
@@ -257,7 +262,7 @@ void performCommand(message *msg, unsigned sNum, unsigned clientNum) {
                 }
             }
             if (sessionNum == 0) {
-                sendResponse(JOIN_SESS_NACK, "Session with that name not found!\n", sNum, clientNum);
+                sendResponse(JOIN_SESS_NACK, "Session with that name not found!", sNum, clientNum);
                 return;
             }
             unsigned numClients = sList[sessionNum].numClients;
@@ -272,7 +277,7 @@ void performCommand(message *msg, unsigned sNum, unsigned clientNum) {
             break;
         case LEAVE_SESS:
             if (sNum == 0) {
-                sendResponse(LEAVE_SESS_NACK, "You're not in a session to leave!\n", sNum, clientNum);
+                sendResponse(LEAVE_SESS_NACK, "You're not in a session to leave!", sNum, clientNum);
                 return;
             }
             numClients = sList[0].numClients;

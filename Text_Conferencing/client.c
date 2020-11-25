@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
         strLength = 0;
         msgAsString = messageToString(msg, &strLength);
         // Send message to server
-        fprintf(stderr, "Sending data: %s\n", msgAsString);
+        // fprintf(stderr, "Sending data: %s\n", msgAsString);
         sendto(sockfd, msgAsString, strLength, MSG_CONFIRM, serverInfo->ai_addr, serverInfo->ai_addrlen);
     }
     close(sockfd);
@@ -109,7 +109,6 @@ void *getResponse(void *sockfd) {
         response[bytesRecv] = '\0';
         message *msg = parseMessageAsString(response);
         evaluateResponse(msg);
-        fprintf(stderr, "%s\n", response);
     }
 }
 
@@ -124,7 +123,7 @@ message *parseInput(char *input) {
     if (strncmp(input, "/", 1) == 0) { // Command
         if (strncmp(input + 1, "login ", 6) == 0) {
             char *command = strtok(input, " ");
-            char* clientID = strtok(NULL, " ");
+            char *clientID = strtok(NULL, " ");
             char *password = strtok(NULL, " ");
             char *serverIP = strtok(NULL, " ");
             char *port = strtok(NULL, " ");
@@ -132,6 +131,7 @@ message *parseInput(char *input) {
                 fprintf(stderr, "Invalid login string\n");
                 return NULL;
             }
+            fprintf(stderr, "User name: %s, Password: %s\n", clientID, password);
             strcpy(username, clientID);
             msg->type = LOGIN;
             msg->size = strlen(password);
@@ -208,10 +208,10 @@ char *messageToString(message *msg, unsigned *size) {
     result = (char *)realloc(result, bytesPrinted + msg->size);
     // Inserts data where snprintf put '\0'
     memcpy(result + bytesPrinted, msg->data, msg->size);
-    fprintf(stderr, "String with data: ");
-    for (int i = 0; i < bytesPrinted + msg->size; ++i)
-        fprintf(stderr, "%c", result[i]);
-    fprintf(stderr, "\nLength: %d\n", bytesPrinted + msg->size);
+    // fprintf(stderr, "String with data: ");
+    // for (int i = 0; i < bytesPrinted + msg->size; ++i)
+    //     fprintf(stderr, "%c", result[i]);
+    // fprintf(stderr, "\nLength: %d\n", bytesPrinted + msg->size);
     *size = bytesPrinted + msg->size;
     return result;
 }
@@ -229,28 +229,29 @@ message *parseMessageAsString(char *input) {
     return msg;
 }
 
-void evaluateResponse(message* msg){
+void evaluateResponse(message* msg) {
+    // fprintf(stderr, "Evaluating response\n");
     switch (msg->type) {
         case MESSAGE_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
         case LOGIN_ACK:
-            fprintf(stdout, "Login successful.\n");
+            fprintf(stderr, "Login successful.\n");
             break;
         case LOGIN_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
         case LOGOUT_ACK:
-            fprintf(stdout, "Logout successful.\n");
+            fprintf(stderr, "Logout successful.\n");
             break;
         case LOGOUT_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
         case NEW_SESS_ACK:
-            fprintf(stdout, "Session created successful.\n");
+            fprintf(stderr, "Session created successfully.\n");
             break;
         case JOIN_SESS_ACK:
-            fprintf(stdout, "Join session successful.\n");
+            fprintf(stderr, "Join session successful.\n");
             break;
         case JOIN_SESS_NACK:
             fprintf(stderr, "%s\n", msg->data);
@@ -259,7 +260,7 @@ void evaluateResponse(message* msg){
             fprintf(stderr, "%s\n", msg->data);
             break;
         case LEAVE_SESS_ACK:
-            fprintf(stdout, "Leave session successful.\n");
+            fprintf(stderr, "Leave session successful.\n");
             break;
         case LEAVE_SESS_NACK:
             fprintf(stderr, "%s\n", msg->data);
