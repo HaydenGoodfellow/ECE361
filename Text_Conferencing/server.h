@@ -26,6 +26,7 @@ typedef struct clientData {
 
 typedef struct session {
     pthread_t* thread;
+    char *sessionName;
     unsigned sessionNum;
     struct pollfd clientFds[64]; // Max 64 clients
     unsigned numClients;
@@ -45,4 +46,5 @@ void broadcastMessage(message *msg, unsigned sNum, unsigned clientNum);
 
 void performCommand(message *msg, unsigned sNum, unsigned clientNum);
 
-void sendResponse(char *response, unsigned sNum, unsigned clientNum);
+void sendResponse(messageTypes type, char *response, unsigned sNum, unsigned clientNum);
+
