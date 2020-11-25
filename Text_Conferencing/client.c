@@ -108,7 +108,12 @@ void *getResponse(void *sockfd) {
         int bytesRecv = recv(*((int *)sockfd), response, MAX_SOCKET_INPUT_SIZE, 0);
         response[bytesRecv] = '\0';
         message *msg = parseMessageAsString(response);
-        evaluateResponse(msg);
+        if (msg->type == MESSAGE){
+            fprintf(stderr, "Message source: %s\n Data: %s\n", msg->source, msg->data);
+        }
+        else{
+            evaluateResponse(msg);
+        }
     }
 }
 
