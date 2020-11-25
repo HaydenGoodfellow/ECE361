@@ -7,6 +7,8 @@ typedef enum messageTypes {
     LOGIN_ACK,
     LOGIN_NAK,
     LOGOUT,
+    LOGOUT_ACK,
+    LOGOUT_NACK,
     EXIT,
     NEW_SESS,
     NEW_SESS_ACK,

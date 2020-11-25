@@ -4,7 +4,7 @@
 // Found online at: https://beej.us/guide/bgnet/html/
 
 session sList[64]; // Session List
-
+int numSessions;
 
 int main(int argc, char **argv) {
 	if (argc < 2 || (atoi(argv[1]) <= 0)) {
@@ -144,7 +144,7 @@ message *parseMessageAsString(char *input) {
     char *type = strtok(input, ":");
     char *size = strtok(NULL, ":");
     char *source = strtok(NULL, ":");
-    unsigned dataIndex = 4 + strlen(type) + strlen(size) + strlen(source);
+    unsigned dataIndex = 3 + strlen(type) + strlen(size) + strlen(source);
     message *msg = malloc(sizeof(message));
     msg->type = atoi(type);
     msg->size = atoi(size);
@@ -196,14 +196,38 @@ void performCommand(message *msg, unsigned sNum, unsigned clientNum) {
                 strncpy(sList[sNum].clients[clientNum].name, msg->data, msg->size);
                 // Mark as logged in
                 sList[sNum].clients[clientNum].loggedIn = true;
+                // Send login acknowledgement
+                sendResponse(LOGIN_ACK, "", sNum, clientNum);
             }
             else { // Already logged in
-                
+                sendResponse(LOGIN_NACK, "Error: You are already logged in!\n", sNum, clientNum);
             }
             break;
         case LOGOUT:
+            if (sList[sNum].clients[clientNum].loggedIn) { // Logged in
+                // Free username
+                free(sList[sNum].clients[clientNum].name);
+                sList[sNum].clients[clientNum].name = NULL;
+                // Free password
+                free(sList[sNum].clients[clientNum].password);
+                sList[sNum].clients[clientNum].password = NULL;
+                // Mark as logged in
+                sList[sNum].clients[clientNum].loggedIn = false;
+                // Send login acknowledgement
+                sendResponse(LOGOUT_ACK, "", sNum, clientNum);
+            }
+            else { // Already logged out
+                sendResponse(LOGOUT_NACK, "Error: You are not logged in!\n", sNum, clientNum);
+            }
             break;
         case NEW_SESS:
+            if (numSessions < 63 && sNum == 0) {
+                strcpy(sList[numSessions].sessionName, msg->data);
+                sList[numSessions].sessionNum = numSessions;
+                sList[numSessions].clientFds[0].fd = sList[0].clientFds[clientNum].fd;
+                sList[numSessions].clientFds[0].events = POLLIN;
+                
+            }
             break;
         case JOIN_SESS:
             break;
