@@ -108,8 +108,12 @@ void *getResponse(void *sockfd) {
         int bytesRecv = recv(*((int *)sockfd), response, MAX_SOCKET_INPUT_SIZE, 0);
         response[bytesRecv] = '\0';
         message *msg = parseMessageAsString(response);
-        evaluateResponse(msg);
-        fprintf(stderr, "%s\n", response);
+        if (msg->type == MESSAGE){
+            fprintf(stderr, "Message source: %s\n Data: %s\n", msg->source, msg->data);
+        }
+        else{
+            evaluateResponse(msg);
+        }
     }
 }
 
@@ -235,22 +239,22 @@ void evaluateResponse(message* msg){
             fprintf(stderr, "%s\n", msg->data);
             break;
         case LOGIN_ACK:
-            fprintf(stdout, "Login successful.\n");
+            fprintf(stderr, "Login successful.\n");
             break;
         case LOGIN_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
         case LOGOUT_ACK:
-            fprintf(stdout, "Logout successful.\n");
+            fprintf(stderr, "Logout successful.\n");
             break;
         case LOGOUT_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
         case NEW_SESS_ACK:
-            fprintf(stdout, "Session created successful.\n");
+            fprintf(stderr, "Session created successful.\n");
             break;
         case JOIN_SESS_ACK:
-            fprintf(stdout, "Join session successful.\n");
+            fprintf(stderr, "Join session successful.\n");
             break;
         case JOIN_SESS_NACK:
             fprintf(stderr, "%s\n", msg->data);
@@ -259,7 +263,7 @@ void evaluateResponse(message* msg){
             fprintf(stderr, "%s\n", msg->data);
             break;
         case LEAVE_SESS_ACK:
-            fprintf(stdout, "Leave session successful.\n");
+            fprintf(stderr, "Leave session successful.\n");
             break;
         case LEAVE_SESS_NACK:
             fprintf(stderr, "%s\n", msg->data);
