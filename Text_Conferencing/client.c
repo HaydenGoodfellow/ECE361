@@ -234,7 +234,7 @@ void evaluateResponse(message* msg){
         case LOGIN_ACK:
             fprintf(stdout, "login successful.\n");
             break;
-        case LOGIN_NAK:
+        case LOGIN_NACK:
             fprintf(stderr, msg->data);
             break;
         case LOGOUT_ACK:
@@ -254,6 +254,12 @@ void evaluateResponse(message* msg){
             break;
         case QUERY_ACK:
             fprintf(stdout, msg->data);
+            break;
+        case LEAVE_SESS_ACK:
+            fprintf(stdout, "leave session successful.\n");
+            break;
+        case LEAVE_SESS_NACK:
+            fprintf(stderr, msg->data);
             break;
         default:
             break;
