@@ -32,11 +32,16 @@ int main(int argc, char **argv) {
     // Allocate heap memory for client list and session list
     clients = malloc(sizeof(ClientList));
     assert(clients != NULL);
+    // Initialize mutex locks and monitors
     int ret = pthread_mutex_init(&clients->clientListLock, NULL);
     assert(ret == 0);
     sessions = malloc(sizeof(SessionList));
     assert(sessions != NULL);
     ret = pthread_mutex_init(&sessions->sessionListLock, NULL);
+    assert(ret == 0);
+    ret = pthread_mutex_init(&sessions->metaSessionLock, NULL);
+    assert(ret == 0);
+    ret = pthread_cond_init(&sessions->metaSessionHasMembers, NULL);
     assert(ret == 0);
 
     // Create meta session for people not in a session (Doesn't allow talking, only commands)
@@ -129,7 +134,7 @@ int establishConnection(char *portNum) {
 void *pollSession(void *sessionPtr) {
     Session *session = (Session *)sessionPtr;
     fprintf(stderr, "In thread for session: %s\n", session->name);
-    while (true) {
+    while (!session->sessionDeleted) {
         unsigned numClients = session->numClients;
         int pollRet = poll(session->clientFds, numClients, 500); // Blocks, may change to timeout
         if (pollRet == 0)
@@ -153,6 +158,11 @@ void *pollSession(void *sessionPtr) {
             }
         }
     }
+    // Session was deleted so we need to free session and its data
+    free(session->name);
+    free(session->thread); // Is this even legal?
+    free(session);
+    pthread_exit(0);
     return NULL;
 }
 
@@ -160,7 +170,11 @@ void *pollSession(void *sessionPtr) {
 void *pollMetaSession(void *metaSessionPtr) {
     Session *metaSession = (Session *)metaSessionPtr;
     while (true) {
+        lock(&sessions->metaSessionLock);
         unsigned numClients = metaSession->numClients;
+        while (numClients == 0) // This avoids spining while waiting for members
+            wait(&sessions->metaSessionHasMembers, &sessions->metaSessionLock);
+        unlock(&sessions->metaSessionLock);
         int pollRet = poll(metaSession->clientFds, numClients, 500); // Blocks, may change to timeout
         if (pollRet == 0)
             continue;
@@ -220,9 +234,6 @@ char *messageToString(message *msg, unsigned *size) {
     // Inserts data where snprintf put '\0'
     memcpy(result + bytesPrinted, msg->data, msg->size);
     // fprintf(stderr, "String with data: ");
-    // for (int i = 0; i < bytesPrinted + msg->size; ++i)
-    //     fprintf(stderr, "%c", result[i]);
-    // fprintf(stderr, "\nLength: %d\n", bytesPrinted + msg->size);
     *size = bytesPrinted + msg->size;
     return result;
 }
@@ -296,7 +307,7 @@ void performCommand(message *msg, Session *session, Client *client) {
                 sendResponse(LOGOUT_NACK, "Error: You are not logged in!", client);
             }
             break;
-        case NEW_SESS: ;
+        case NEW_SESS: ; {
             // Check if session with that name already exists
             Session *searchSession = searchForSession(msg->data);
             if (searchSession != NULL) {
@@ -306,38 +317,23 @@ void performCommand(message *msg, Session *session, Client *client) {
             fprintf(stderr, "Creating new session: %s\n", msg->data);
             Session *newSession = initSession(msg->data);
             addSessionToList(newSession);
-            // TODO: Adder error checking here
-            addClientToSession(client, session);
+            // TODO: Add error checking here
+            addClientToSession(client, newSession);
             sendResponse(NEW_SESS_ACK, "", client);
             newSession->thread = malloc(sizeof(pthread_t));
             pthread_create((pthread_t *) newSession->thread, NULL, (void *) pollSession, (void *) newSession);
-            break;
-        case JOIN_SESS:
-            // if (sNum != 0) {
-            //     sendResponse(JOIN_SESS_NACK, "Can't join another session while in a session!", sNum, clientNum);
-            //     return;
-            // }
-            // unsigned sessionNum = 0;
-            // for (int i = 1; i < numSessions; ++i) {
-            //     if (strcmp(sList[i].sessionName, msg->data) == 0) {
-            //         sessionNum = i;
-            //         break;
-            //     }
-            // }
-            // if (sessionNum == 0) {
-            //     sendResponse(JOIN_SESS_NACK, "Session with that name not found!", sNum, clientNum);
-            //     return;
-            // }
-            // unsigned numClients = sList[sessionNum].numClients;
-            // sList[sessionNum].clientFds[numClients].fd = sList[0].clientFds[clientNum].fd;
-            // sList[sessionNum].clientFds[numClients].events = POLLIN;
-            // sList[sessionNum].clients[numClients].name = sList[0].clients[clientNum].name;
-            // sList[sessionNum].clients[numClients].password = sList[0].clients[clientNum].password;
-            // sendResponse(JOIN_SESS_ACK, "", sNum, clientNum);
-            // removeClientFromSession(0, clientNum);
-            // --sList[0].numClients;
-            // ++sList[sessionNum].numClients;
-            break;
+            break; }
+        case JOIN_SESS: ; {
+            Session *searchSession = searchForSession(msg->data);
+            if (searchSession == NULL) {
+                sendResponse(JOIN_SESS_NACK, "Session with that name does not exist!", client);
+                return;
+            }
+            // TODO: Add error checking here
+            addClientToSession(client, searchSession);
+            sendResponse(JOIN_SESS_ACK, "", client);
+            assert(searchSession->thread != NULL);
+            break; }
         case LEAVE_SESS:
             // if (sNum == 0) {
             //     sendResponse(LEAVE_SESS_NACK, "You're not in a session to leave!", sNum, clientNum);
@@ -354,17 +350,18 @@ void performCommand(message *msg, Session *session, Client *client) {
             // --sList[sNum].numClients;
             break;
         case QUERY: ;
-            // char result[2048];
-            // for (int i = 0; i < numSessions; ++i) {
-            //     int strLength = 0; 
-            //     char sessionInfo[512];
-            //     strLength += sprintf(sessionInfo, "Session: %s\nUsers: \n", sList[i].sessionName);
-            //     for (int j = 0; j < sList[i].numClients; ++j) {
-            //         strLength += sprintf(sessionInfo + strLength, "%s\n", sList[i].clients[j].name);
-            //     }
-            //     strcat(result, sessionInfo);
-            // }
-            // sendResponse(QUERY_ACK, result, sNum, clientNum);
+            char result[2048];
+            Session *sessionData;
+            for (sessionData = sessions->frontSession; sessionData != NULL; sessionData = sessionData->nextSession) {
+                int strLength = 0; 
+                char sessionInfo[512];
+                strLength += sprintf(sessionInfo, "Session: %s\nUsers: \n", sessionData->name);
+                for (int j = 0; j < sessionData->numClients; ++j) {
+                    strLength += sprintf(sessionInfo + strLength, "%s\n", sessionData->clients[j]->name);
+                }
+                strcat(result, sessionInfo);
+            }
+            sendResponse(QUERY_ACK, result, client);
             break;
         case EXIT:
             // removeClientFromSession(sNum, clientNum);

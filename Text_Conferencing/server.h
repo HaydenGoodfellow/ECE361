@@ -20,17 +20,23 @@
 #include "message.h"
 
 #define MAX_SOCKET_INPUT_SIZE 2048
+#define MAX_SESSIONS_PER_CLIENT 64
+#define MAX_CLIENTS_IN_SESSION 64
 
-#define MAX_NUM_CLIENTS_IN_SESSION 64
+// Forward declarations to avoid unknown type name errors
+typedef struct Client Client;
+typedef struct Session Session;
 
 // Stuct for storing client data. Mostly needed for the name 
-typedef struct Client Client;
 struct Client {
     char *name;
     char *password; // Super not secure, only doing this for project
     bool loggedIn;
     // File descriptor for communication with client
     int clientfd;
+    // Array which stores pointers to the sessions which the client is in
+    Session *sessions[MAX_SESSIONS_PER_CLIENT];
+    unsigned numSessions;
     // Pointers for the doubly linked list
     Client *nextClient;
     Client *prevClient;
@@ -45,17 +51,18 @@ typedef struct ClientList {
 } ClientList;
 
 // Struct for session data
-typedef struct Session Session;
 struct Session {
     pthread_t* thread;
     char *name;
-    struct pollfd clientFds[MAX_NUM_CLIENTS_IN_SESSION]; 
+    struct pollfd clientFds[MAX_CLIENTS_IN_SESSION]; 
     // Array which stores pointers to the client data stored in client list
-    Client *clients[MAX_NUM_CLIENTS_IN_SESSION];
+    Client *clients[MAX_CLIENTS_IN_SESSION];
     unsigned numClients;
     // Pointers for the doubly linked list
     Session *nextSession;
     Session *prevSession;
+    // Flag for if session is deleted and thread should exit
+    volatile int sessionDeleted;
 };
 
 // Doubly linked list of active sessions
@@ -64,6 +71,10 @@ typedef struct SessionList {
     Session *backSession;
     unsigned numSessions;
     pthread_mutex_t sessionListLock;
+    // Since meta session can have no member we don't want it to spin while waiting for one
+    // So use a monitor to wake it up if it slept when it had no members
+    pthread_mutex_t metaSessionLock;
+    pthread_cond_t metaSessionHasMembers;
 } SessionList;
 
 //==============================================//
@@ -100,7 +111,7 @@ void sendResponse(messageTypes type, char *response, Client *client);
 void performCommand(message *msg, Session *session, Client *client);
 
 //==============================================//
-// Functions for session list (list_functions.c)
+// Functions for sessions (list_functions.c)
 //==============================================//
 // Initialize session data
 Session *initSession(char *sessionName);
@@ -108,10 +119,13 @@ Session *initSession(char *sessionName);
 // Add session to the end of the linked list of sessions
 void addSessionToList(Session *newSession);
 
-// Add client to list and begin polling for data from that client
+// Removes session from the linked list
+void removeSessionFromList(Session *session);
+
+// Add client to session and begin polling for data. Removes client from meta session if in it
 void addClientToSession(Client *newClient, Session *session);
 
-// Remove client from session list. Delete session if no more clients
+// Remove client from session list. Deletes session if no more clients
 void removeClientFromSession(Client *client, Session *session);
 
 // Update the pollfds array to remove clients that left or include clients that joined
@@ -121,13 +135,16 @@ void updatePollfds(Session *session);
 Session *searchForSession(char *sessionName);
 
 //==============================================//
-// Functions for client list (list_functions.c)
+// Functions for client objects (list_functions.c)
 //==============================================//
 // Initialize session data
 Client *initClient(char *name, int clientfd);
 
 // Add session to the end of the linked list of clients
 void addClientToList(Client *newClient);
+
+// Search for a client in a specifc session. Returns false if not found
+bool clientIsInSession(Client *client, Session *session);
 
 
 #endif // SERVER_H
