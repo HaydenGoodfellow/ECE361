@@ -4,7 +4,7 @@ LINKFLAGS = -lm -lpthread
 DEPS = message.h server.h client.h 
 SERVEROBJS = list_functions.o server.o 
 	
-server: $(SERVEROBJS)
+server: server.o list_functions.o
 	$(CC) $(LINKFLAGS) -o server server.c list_functions.c
 
 client: client.o 

@@ -36,12 +36,9 @@ int main(int argc, char **argv) {
     assert(ret == 0);
 
     // Create meta session for people not in a session (Doesn't allow talking, only commands)
-    session *metaSession = newSession("Not in a Session");
+    session *metaSession = initSession("Not in a Session");
     addSessionToList(metaSession);
-
-
     volatile int threadForMetaSession = 0;
-
 
     // Set up fd we will poll and accept other fds from
     struct pollfd fds[1];
@@ -49,23 +46,24 @@ int main(int argc, char **argv) {
     fds[0].fd = listenSock;
     fds[0].events = POLLIN;
     // Wait for new clients to connect to the socket
-    // struct sockaddr client;
-    // socklen_t clientAddrLen;
+    struct sockaddr clientAddr;
+    socklen_t clientAddrLen;
     while (true) {
         int pollRet = poll(fds, 1, -1);
         if (pollRet == 0)
             continue;
         assert(fds[0].revents & POLLIN); // Ensure read ready
         fprintf(stderr, "Received connection on listener socket\n");
-        // clientAddrLen = sizeof(client);
-        // int clientfd = accept(listenSock, (struct sockaddr *)&client, (socklen_t *)&clientAddrLen);
-
+        clientAddrLen = sizeof(clientAddr);
+        int clientfd = accept(listenSock, (struct sockaddr *)&clientAddr, (socklen_t *)&clientAddrLen);
+        // Create client object for newly connected client with unknown name
+        client *newClient = initClient("Unknown", clientfd);
         // sList[0].clientFds[sList[0].numClients].fd = clientfd;
         // sList[0].clientFds[sList[0].numClients].events = POLLIN;
         // sList[0].numClients++;
         // fprintf(stderr, "New client fd: %d, Num clients: %d\n", clientfd, sList[0].numClients);
         if (!threadForMetaSession) {
-            fprintf(stderr, "Creating thread\n");
+            fprintf(stderr, "Creating thread for meta session\n");
             // sList[0].thread = malloc(sizeof(pthread_t));
             // pthread_create((pthread_t *) sList[0].thread, NULL, (void *) pollMetaSession, NULL);
             threadForMetaSession = 1;
@@ -121,20 +119,6 @@ int establishConnection(char *portNum) {
     }
     return listenSock;
 }
-
-// Initialize session data
-session *newSession(char *sessionName) {
-    session *newSession = malloc(sizeof(session));
-    newSession->name = strdup(sessionName); // Deep copy not shallow copy as the string is on stack
-    for (int i = 0; i < MAX_NUM_CLIENTS_IN_SESSION; ++i) 
-        newSession->clients[i] = NULL;
-    newSession->numClients = 0;
-    newSession->nextSession = NULL;
-    newSession->prevSession = NULL;
-    return newSession;
-}
-
-
 
 // Poll for data from clients in a given session. One thread for each session
 void *pollSession(void *sessionNum /*Session number*/) {

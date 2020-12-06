@@ -29,6 +29,8 @@ struct client {
     char *name;
     char *password; // Super not secure, only doing this for project
     bool loggedIn;
+    // File descriptor for communication with client
+    int clientfd;
     // Pointers for the doubly linked list
     client *nextClient;
     client *prevClient;
@@ -101,10 +103,13 @@ char *messageToString(message *msg, unsigned *size);
 // Functions for session list (list_functions.c)
 //==============================================//
 // Initialize session data
-session *newSession(char *sessionName);
+session *initSession(char *sessionName);
 
 // Add session to the end of the linked list of sessions
 void addSessionToList(session *newSession);
+
+// Add client to list and begin polling for data from that client
+void addClientToSession(client *newClient, session *sess);
 
 // Remove client from session list. Delete session if no more clients
 void removeClientFromSession(unsigned sNum, unsigned clientNum);
@@ -113,7 +118,7 @@ void removeClientFromSession(unsigned sNum, unsigned clientNum);
 // Functions for client list (list_functions.c)
 //==============================================//
 // Initialize session data
-client *newClient(char *name);
+client *initClient(char *name, int clientfd);
 
 // Add session to the end of the linked list of sessions
 void addClientToList(client *newClient);
