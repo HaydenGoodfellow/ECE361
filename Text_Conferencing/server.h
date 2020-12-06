@@ -1,3 +1,6 @@
+#ifndef SERVER_H
+#define SERVER_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -18,34 +21,102 @@
 
 #define MAX_SOCKET_INPUT_SIZE 2048
 
-typedef struct clientData {
+#define MAX_NUM_CLIENTS_IN_SESSION 64
+
+// Stuct for storing client data. Mostly needed for the name 
+typedef struct client client;
+struct client {
     char *name;
     char *password; // Super not secure, only doing this for project
     bool loggedIn;
-} clientData;
+    // Pointers for the doubly linked list
+    client *nextClient;
+    client *prevClient;
+};
 
-typedef struct session {
-    pthread_t* thread;
-    char *sessionName;
-    unsigned sessionNum;
-    struct pollfd clientFds[64]; // Max 64 clients
+// Doubly linked list of all clients
+typedef struct clientList {
+    client *frontClient;
+    client *backClient;
     unsigned numClients;
-    clientData clients[64]; // Max 64 clients
-} session;
+    pthread_mutex_t clientListLock;
+} clientList;
+
+// Struct for session data
+typedef struct session session;
+struct session {
+    pthread_t* thread;
+    char *name;
+    struct pollfd clientFds[MAX_NUM_CLIENTS_IN_SESSION]; 
+    // Array which stores pointers to the client data stored in client list
+    client *clients[MAX_NUM_CLIENTS_IN_SESSION];
+    unsigned numClients;
+    // Pointers for the doubly linked list
+    session *nextSession;
+    session *prevSession;
+};
+
+// Doubly linked list of active sessions
+typedef struct sessionList {
+    session *frontSession;
+    session *backSession;
+    unsigned numSessions;
+    pthread_mutex_t sessionListLock;
+} sessionList;
+
+//==============================================//
+// Server core functions (server.c)
+//==============================================//
+// Poll for data from clients in a given session. One thread for each session
+void *pollSession(void *sessionNum);
 
 // Session 0 (meta session) is for users who are not in a session and it only accepts commands
 void *pollMetaSession();
 
-void *pollSession(void *sessionNum);
-
-message *parseMessageAsString(char *input);
-
-char *messageToString(message *msg, unsigned *size);
-
-void broadcastMessage(char *messageAsString, unsigned strLength, unsigned sNum, unsigned clientNum);
-
+// Perform command given by a client
 void performCommand(message *msg, unsigned sNum, unsigned clientNum);
 
+//==============================================//
+// Communication functions (server.c)
+//==============================================//
+// Create and open socket. Set it as listener. Returns socket file descriptor
+int establishConnection(char *portNum);
+
+// Send message to all connected clients
+void broadcastMessage(char *messageAsString, unsigned strLength, unsigned sNum, unsigned clientNum);
+
+// Send message to specific client
 void sendResponse(messageTypes type, char *response, unsigned sNum, unsigned clientNum);
 
+//==============================================//
+// Serialization functions (server.c)
+//==============================================//
+// Converts string from socket to message type for analysis
+message *parseMessageAsString(char *input);
+
+// Convert message to string. Return size in size parameter
+char *messageToString(message *msg, unsigned *size);
+
+//==============================================//
+// Functions for session list (list_functions.c)
+//==============================================//
+// Initialize session data
+session *newSession(char *sessionName);
+
+// Add session to the end of the linked list of sessions
+void addSessionToList(session *newSession);
+
+// Remove client from session list. Delete session if no more clients
 void removeClientFromSession(unsigned sNum, unsigned clientNum);
+
+//==============================================//
+// Functions for client list (list_functions.c)
+//==============================================//
+// Initialize session data
+client *newClient(char *name);
+
+// Add session to the end of the linked list of sessions
+void addClientToList(client *newClient);
+
+
+#endif // SERVER_H

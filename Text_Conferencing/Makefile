@@ -1,12 +1,19 @@
-CC := gcc
-CFLAGS := -g -Wall
-DEPS = packet.h server.h client.h
-
-%.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
-
-server: server.o 
-	$(CC) -o server server.o -lm -lpthread
+CC = gcc
+CFLAGS = -g -Wall
+LINKFLAGS = -lm -lpthread
+DEPS = message.h server.h client.h 
+SERVEROBJS = list_functions.o server.o 
+	
+server: $(SERVEROBJS)
+	$(CC) $(LINKFLAGS) -o server server.c list_functions.c
 
 client: client.o 
-	$(CC) -o client client.o -lm -lpthread
+	$(CC) $(LINKFLAGS) -o client client.c 
+
+server.o: list_functions.c server.c server.h message.h 
+list_functions.o: server.h
+client.o: client.h message.h
+
+# remove object files and other junk
+clean:
+	rm -f client.o server.o list_functions.o core

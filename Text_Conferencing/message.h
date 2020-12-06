@@ -1,3 +1,6 @@
+#ifndef MESSAGE_H
+#define MESSAGE_H
+
 #define MAX_NAME 64 // bytes/characters
 #define MAX_DATA 2048 // bytes/characters
 
@@ -30,3 +33,5 @@ typedef struct message {
     char source[MAX_NAME];
     char data[MAX_DATA];
 } message;
+
+#endif // MESSAGE_H
