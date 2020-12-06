@@ -51,10 +51,11 @@ void addSessionToList(Session *newSession) {
 
 // Add client to list and begin polling for data from that client
 void addClientToSession(Client *newClient, Session *session) {
+    bool addingToMetaSession = (sessions->frontSession == session);
     if ((newClient->numSessions < MAX_SESSIONS_PER_CLIENT) && (session->numClients < MAX_CLIENTS_IN_SESSION)) {
-        bool addingToMetaSession = (sessions->frontSession == session);
         if (!addingToMetaSession) { // We don't add the meta session's data to clients
             // Add session pointer to the client data
+            fprintf(stderr, "Adding session %s data to client %s\n", session->name, newClient->name);
             newClient->sessions[newClient->numSessions] = session;
             ++newClient->numSessions;
         }
@@ -69,6 +70,8 @@ void addClientToSession(Client *newClient, Session *session) {
     else {
         fprintf(stderr, "Error adding client: Session is full!\n");
     }
+    if (addingToMetaSession) // Ensure client has no sessions if they're in the meta session
+        assert(newClient->numSessions == 0);
 }
 
 // Remove client from session list and the session from the clients list
@@ -78,6 +81,7 @@ void removeClientFromSession(Client *client, Session *session) {
         fprintf(stderr, "Client %s is not in session %s\n", client->name, session == sessions->frontSession ? "Meta Session" : session->name);
         return;
     }
+    fprintf(stderr, "Removing client %s from session %s\n", client->name, session->name);
     bool removeFromMetaSession = (sessions->frontSession == session);
     // Remove client data from session
     int ret = removeClientDataFromSession(client, session);
@@ -156,6 +160,7 @@ static int removeSessionDataFromClient(Session *session, Client *client) {
 static void deleteSession(Session *session) {
     assert(session->numClients == 0); // Ensure the session is empty
     assert(session != sessions->frontSession); // Ensure we're not deleting meta session
+    fprintf(stderr, "Deleting session %s\n", session->name);
     // Remove pointers to this session from the doubly linked list
     if (session == sessions->backSession) {  // If session is at end
         assert(session->nextSession == NULL);
