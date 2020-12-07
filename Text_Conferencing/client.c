@@ -154,7 +154,7 @@ message *parseInput(char *input) {
         }
         else if (strncmp(input + 1, "createsession ", 14) == 0) {
             char *command = strtok(input, " ");
-            char *sessionID = strtok(NULL, " ");
+            char *sessionID = strtok(NULL, "\0");
             if (!command || !sessionID) {
                 fprintf(stderr, "Invalid join session string\n");
                 return NULL;
@@ -167,7 +167,7 @@ message *parseInput(char *input) {
         }
         else if (strncmp(input + 1, "joinsession ", 12) == 0) {
             char *command = strtok(input, " ");
-            char *sessionID = strtok(NULL, " ");
+            char *sessionID = strtok(NULL, "\0");
             if (!command || !sessionID) {
                 fprintf(stderr, "Invalid join session string\n");
                 return NULL;
@@ -261,8 +261,11 @@ void evaluateResponse(message* msg) {
         case NEW_SESS_ACK:
             fprintf(stderr, "Session created successfully.\n");
             break;
+        case NEW_SESS_NACK:
+            fprintf(stderr, "%s\n", msg->data);
+            break;
         case JOIN_SESS_ACK:
-            fprintf(stderr, "Join session successful.\n");
+            fprintf(stderr, "Successfully joined session.\n");
             break;
         case JOIN_SESS_NACK:
             fprintf(stderr, "%s\n", msg->data);
@@ -271,7 +274,7 @@ void evaluateResponse(message* msg) {
             fprintf(stderr, "%s", msg->data);
             break;
         case LEAVE_SESS_ACK:
-            fprintf(stderr, "Leave session successful.\n");
+            fprintf(stderr, "Successfully left session.\n");
             break;
         case LEAVE_SESS_NACK:
             fprintf(stderr, "%s\n", msg->data);

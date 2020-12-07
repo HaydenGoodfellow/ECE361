@@ -135,16 +135,17 @@ void *pollSession(void *sessionPtr) {
     Session *session = (Session *)sessionPtr;
     fprintf(stderr, "In thread for session: %s\n", session->name);
     while (!session->sessionDeleted) {
-        unsigned numClients = session->numClients;
+        // TODO: Implement measures for when a client disconnects. Currently hangs server thread
+        unsigned numClients = session->numClients; 
         int pollRet = poll(session->clientFds, numClients, 500); // Blocks, may change to timeout
         if (pollRet == 0)
             continue;
-        fprintf(stderr, "Received data on meta session socket. Num clients: %d\n", numClients);
+        fprintf(stderr, "Received data on session \"%s\" socket. Num clients: %d\n", session->name, session->numClients);
         for (int i = 0; i < numClients; ++i) {
             if (session->clientFds[i].revents & POLLIN) { // Got data from this client
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
                 recv(session->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
-                fprintf(stderr, "Received data from client: %s data: %s\n", session->clients[i]->name, input);
+                fprintf(stderr, "Received data from client: %s Data: %s\n", session->clients[i]->name, input);
                 message *msg = parseMessageAsString(input);
                 if (msg->type == MESSAGE) {
                     unsigned strLength = 0;
@@ -158,6 +159,7 @@ void *pollSession(void *sessionPtr) {
             }
         }
     }
+    fprintf(stderr, "Freeing data and exiting thread for session: %s\n", session->name);
     // Session was deleted so we need to free session and its data
     free(session->name);
     free(session->thread); // Is this even legal?
@@ -181,12 +183,12 @@ void *pollMetaSession(void *metaSessionPtr) {
         int pollRet = poll(metaSession->clientFds, numClients, 500); // Blocks, may change to timeout
         if (pollRet == 0)
             continue;
-        fprintf(stderr, "Received data on meta session socket. Num clients: %d\n", numClients);
+        fprintf(stderr, "Received data on meta session socket. Num clients: %d\n", metaSession->numClients);
         for (int i = 0; i < numClients; ++i) {
             if (metaSession->clientFds[i].revents & POLLIN) { // Got data from this client
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
                 recv(metaSession->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
-                fprintf(stderr, "Received data from client: %d data: %s\n", session->clients[i]->name, input);
+                fprintf(stderr, "Received data from client: %s Data: %s\n", metaSession->clients[i]->name, input);
                 message *msg = parseMessageAsString(input);
                 // Check if they're trying to do a command while not logged in
                 if (!metaSession->clients[i]->loggedIn && msg->type != LOGIN) {
@@ -278,6 +280,8 @@ void performCommand(message *msg, Session *session, Client *client) {
             // TODO: Implement checking username and password
             // TODO: Solve problem when client is in multiple sessions so it does command multiple times
             if (!client->loggedIn) {
+                // Free "Unknown" name currently in client
+                free(client->name);
                 // Save username
                 client->name = malloc(sizeof(char) * strlen(msg->source));
                 strcpy(client->name, msg->source);
@@ -297,7 +301,7 @@ void performCommand(message *msg, Session *session, Client *client) {
             if (client->loggedIn) {
                 // Free username
                 free(client->name);
-                client->name = NULL;
+                client->name = strdup("Unknown");
                 // Free password
                 free(client->password);
                 client->password = NULL;
@@ -326,7 +330,8 @@ void performCommand(message *msg, Session *session, Client *client) {
             sendResponse(NEW_SESS_ACK, "", client);
             newSession->thread = malloc(sizeof(pthread_t));
             pthread_create((pthread_t *) newSession->thread, NULL, (void *) pollSession, (void *) newSession);
-            break; }
+            break; 
+            }
         case JOIN_SESS: ; {
             Session *searchSession = searchForSession(msg->data);
             if (searchSession == NULL) {
@@ -337,26 +342,24 @@ void performCommand(message *msg, Session *session, Client *client) {
             addClientToSession(client, searchSession);
             sendResponse(JOIN_SESS_ACK, "", client);
             assert(searchSession->thread != NULL);
-            break; }
+            break; 
+            }
         case LEAVE_SESS:
-            // if (sNum == 0) {
-            //     sendResponse(LEAVE_SESS_NACK, "You're not in a session to leave!", sNum, clientNum);
-            //     return;
-            // }
-            // numClients = sList[0].numClients;
-            // sList[0].clientFds[numClients].fd = sList[sNum].clientFds[clientNum].fd;
-            // sList[0].clientFds[numClients].events = POLLIN;
-            // sList[0].clients[numClients].name = sList[sNum].clients[clientNum].name;
-            // sList[0].clients[numClients].password = sList[sNum].clients[clientNum].password;
-            // sendResponse(LEAVE_SESS_ACK, "", sNum, clientNum);
-            // removeClientFromSession(sNum, clientNum);
-            // ++sList[0].numClients;
-            // --sList[sNum].numClients;
+            if (client->numSessions == 0) { // Only in the meta session
+                sendResponse(LEAVE_SESS_NACK, "You're not in a session to leave!", client);
+                return;
+            }
+            // Removes client from the session and deletes session if it is empty
+            removeClientFromSession(client, session);
+            sendResponse(LEAVE_SESS_ACK, "", client);
             break;
-        case QUERY: ;
+        case QUERY: ; {
             char *result = malloc(sizeof(char) * 2048);
+            strcat(result, "\%========================================\%\n");
             Session *sessionData;
             for (sessionData = sessions->frontSession; sessionData != NULL; sessionData = sessionData->nextSession) {
+                if (sessionData->numClients == 0)
+                    continue;
                 int strLength = 0; 
                 char sessionInfo[512];
                 fprintf(stderr, "Printing query for session: %s Num Clients: %d\n", sessionData->name, sessionData->numClients);
@@ -366,11 +369,13 @@ void performCommand(message *msg, Session *session, Client *client) {
                 }
                 strcat(result, sessionInfo);
             }
+            strcat(result, "\%========================================\%\n");
             sendResponse(QUERY_ACK, result, client);
             free(result);
-            break;
+            break; 
+            }
         case EXIT:
-            // removeClientFromSession(sNum, clientNum);
+            
             break;
         default:
             break;

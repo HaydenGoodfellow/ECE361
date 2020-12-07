@@ -128,6 +128,7 @@ void removeClientFromSession(Client *client, Session *session) {
 
 // Remove data on specific client stored in session object
 static int removeClientDataFromSession(Client *client, Session *session) {
+    fprintf(stderr, "Removing data of client \"%s\" from session \"%s\"\n", client->name, session->name);
     if (session->clients[session->numClients - 1] == client) { // If the client is at the end just remove them
         session->clients[session->numClients - 1] = NULL;
         --session->numClients;
@@ -154,9 +155,11 @@ static int removeClientDataFromSession(Client *client, Session *session) {
 
 // Remove data on a session from a client's object
 static int removeSessionDataFromClient(Session *session, Client *client) {
+    fprintf(stderr, "Removing data of session \"%s\" from client \"%s\" with numSessions %d\n", session->name, client->name, client->numSessions);
     if (client->sessions[client->numSessions - 1] == session) { // If the session is at the end just remove them
-        session->clients[session->numClients - 1] = NULL;
-        --session->numClients;
+        fprintf(stderr, "Session is at back of client's list\n");
+        client->sessions[client->numSessions - 1] = NULL;
+        --client->numSessions;
     }
     else { // Session is somewhere the client array so remove and update pointers
         bool sessionFound = false;
