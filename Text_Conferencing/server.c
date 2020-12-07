@@ -3,11 +3,11 @@
 // Parts of this code was adapted from Beej's Guide to Network Programming
 // Found online at: https://beej.us/guide/bgnet/html/
 
-// Rename thread functions to simple names for readability
+// Rename mutex functions to simple names for readability
 #define lock(x) pthread_mutex_lock(x) 
 #define unlock(x) pthread_mutex_unlock(x) 
 #define wait(x, y) pthread_cond_wait(x, y) 
-#define signal(x) pthread_cond_signal(x) 
+#define signal_cond(x) pthread_cond_signal(x) 
 #define broadcast(x) pthread_cond_broadcast(x) 
 
 // Doubly linked list which tracks all clients
@@ -144,7 +144,7 @@ void *pollSession(void *sessionPtr) {
             if (session->clientFds[i].revents & POLLIN) { // Got data from this client
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
                 recv(session->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
-                fprintf(stderr, "Received data from client: %d data: %s\n", i, input);
+                fprintf(stderr, "Received data from client: %s data: %s\n", session->clients[i]->name, input);
                 message *msg = parseMessageAsString(input);
                 if (msg->type == MESSAGE) {
                     unsigned strLength = 0;
@@ -172,8 +172,11 @@ void *pollMetaSession(void *metaSessionPtr) {
     while (true) {
         lock(&sessions->metaSessionLock);
         unsigned numClients = metaSession->numClients;
-        while (numClients == 0) // This avoids spining while waiting for members
+        if (numClients == 0) { // This avoids spining while waiting for members
+            fprintf(stderr, "Sleeping in meta session thread\n");
             wait(&sessions->metaSessionHasMembers, &sessions->metaSessionLock);
+            fprintf(stderr, "Woke up in meta session thread\n");
+        }
         unlock(&sessions->metaSessionLock);
         int pollRet = poll(metaSession->clientFds, numClients, 500); // Blocks, may change to timeout
         if (pollRet == 0)
@@ -183,16 +186,16 @@ void *pollMetaSession(void *metaSessionPtr) {
             if (metaSession->clientFds[i].revents & POLLIN) { // Got data from this client
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
                 recv(metaSession->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
-                fprintf(stderr, "Received data from client: %d data: %s\n", i, input);
+                fprintf(stderr, "Received data from client: %d data: %s\n", session->clients[i]->name, input);
                 message *msg = parseMessageAsString(input);
                 // Check if they're trying to do a command while not logged in
                 if (!metaSession->clients[i]->loggedIn && msg->type != LOGIN) {
-                    char response[] = "You must log in first!\n";
+                    char response[] = "You must log in first!";
                     sendResponse(MESSAGE_NACK, response, metaSession->clients[i]);
                 }
                 // Ensure that the client sent a command and not a message
                 else if (msg->type == MESSAGE) {
-                    char response[] = "You can't send messages until you create or join a session!\n";
+                    char response[] = "You can't send messages until you create or join a session!";
                     sendResponse(MESSAGE_NACK, response, metaSession->clients[i]);
                 }
                 else {
@@ -243,12 +246,13 @@ char *messageToString(message *msg, unsigned *size) {
 //==============================================//
 // Send message to all connected clients
 void broadcastMessage(char *messageAsString, unsigned strLength, Session *session, int sender) {
-    fprintf(stderr, "Sending message: %s\n", messageAsString);
+    fprintf(stderr, "Sending message to %d clients in session: %s\n", session->numClients, session->name);
     for (int i = 0; i < session->numClients; ++i) {
         if (i == sender)
             continue;
         send(session->clientFds[i].fd, messageAsString, strLength, 0);
     }
+    fprintf(stderr, "Completed sending message in session: %s\n", session->name);
 }
 
 // Send message to specific client
@@ -350,11 +354,12 @@ void performCommand(message *msg, Session *session, Client *client) {
             // --sList[sNum].numClients;
             break;
         case QUERY: ;
-            char result[2048];
+            char *result = malloc(sizeof(char) * 2048);
             Session *sessionData;
             for (sessionData = sessions->frontSession; sessionData != NULL; sessionData = sessionData->nextSession) {
                 int strLength = 0; 
                 char sessionInfo[512];
+                fprintf(stderr, "Printing query for session: %s Num Clients: %d\n", sessionData->name, sessionData->numClients);
                 strLength += sprintf(sessionInfo, "Session: %s\nUsers: \n", sessionData->name);
                 for (int j = 0; j < sessionData->numClients; ++j) {
                     strLength += sprintf(sessionInfo + strLength, "%s\n", sessionData->clients[j]->name);
@@ -362,6 +367,7 @@ void performCommand(message *msg, Session *session, Client *client) {
                 strcat(result, sessionInfo);
             }
             sendResponse(QUERY_ACK, result, client);
+            free(result);
             break;
         case EXIT:
             // removeClientFromSession(sNum, clientNum);

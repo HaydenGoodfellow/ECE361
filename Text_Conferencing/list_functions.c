@@ -1,5 +1,12 @@
 #include "server.h"
 
+// Rename mutex functions to simple names for readability
+#define lock(x) pthread_mutex_lock(x) 
+#define unlock(x) pthread_mutex_unlock(x) 
+#define wait(x, y) pthread_cond_wait(x, y) 
+#define signal_cond(x) pthread_cond_signal(x) 
+#define broadcast(x) pthread_cond_broadcast(x) 
+
 // Doubly linked list which tracks all clients
 extern ClientList *clients;
 
@@ -55,7 +62,7 @@ void addClientToSession(Client *newClient, Session *session) {
     if ((newClient->numSessions < MAX_SESSIONS_PER_CLIENT) && (session->numClients < MAX_CLIENTS_IN_SESSION)) {
         if (!addingToMetaSession) { // We don't add the meta session's data to clients
             // Add session pointer to the client data
-            fprintf(stderr, "Adding session %s data to client %s\n", session->name, newClient->name);
+            fprintf(stderr, "Adding session \"%s\" data to client \"%s\"\n", session->name, newClient->name);
             newClient->sessions[newClient->numSessions] = session;
             ++newClient->numSessions;
         }
@@ -64,24 +71,39 @@ void addClientToSession(Client *newClient, Session *session) {
         ++session->numClients;
         updatePollfds(session);
     }
-    else if (newClient->numSessions < MAX_SESSIONS_PER_CLIENT) {
+    else if (newClient->numSessions > MAX_SESSIONS_PER_CLIENT) {
         fprintf(stderr, "Error adding session to client: Client is already in max number of sessions!\n");
     }
     else {
         fprintf(stderr, "Error adding client: Session is full!\n");
     }
-    if (addingToMetaSession) // Ensure client has no sessions if they're in the meta session
+    // If client is in a session they can't also be in the meta session
+    if (!addingToMetaSession) {
+        removeClientFromSession(newClient, sessions->frontSession);
+    }
+    else {
+        lock(&sessions->metaSessionLock);
+        // Signal that the meta session has clients in case the thread is sleeping
+        signal_cond(&sessions->metaSessionHasMembers);
+        unlock(&sessions->metaSessionLock);
+        // Ensure client has no sessions if they're in the meta session
         assert(newClient->numSessions == 0);
+    }
 }
 
 // Remove client from session list and the session from the clients list
 void removeClientFromSession(Client *client, Session *session) {
-    // First determine if they're in session
-    if (!clientIsInSession(client, session)) {
-        fprintf(stderr, "Client %s is not in session %s\n", client->name, session == sessions->frontSession ? "Meta Session" : session->name);
+    // Check if session is empty or NULL
+    if (!session || (session->numClients == 0)) {
+        fprintf(stderr, "Error removing client: Session is empty or NULL\n");
         return;
     }
-    fprintf(stderr, "Removing client %s from session %s\n", client->name, session->name);
+    // First determine if they're in session
+    if (!clientIsInSession(client, session)) {
+        fprintf(stderr, "Error removing client: Client \"%s\" is not in session \"%s\"\n", client->name, session == sessions->frontSession ? "Meta Session" : session->name);
+        return;
+    }
+    fprintf(stderr, "Removing client \"%s\" from session \"%s\" with num clients: %d\n", client->name, session->name, session->numClients);
     bool removeFromMetaSession = (sessions->frontSession == session);
     // Remove client data from session
     int ret = removeClientDataFromSession(client, session);
@@ -91,7 +113,7 @@ void removeClientFromSession(Client *client, Session *session) {
         ret = removeSessionDataFromClient(session, client);
         assert(ret == 0);
         if (client->numSessions == 0) { // If its in no sessions add it to the meta one
-            fprintf(stderr, "Adding client %s back to meta sessions as they are no longer in any sessions\n", client->name);
+            fprintf(stderr, "Adding client \"%s\" back to meta sessions as they are no longer in any sessions\n", client->name);
             addClientToSession(client, sessions->frontSession);
         }
     }
@@ -106,8 +128,8 @@ void removeClientFromSession(Client *client, Session *session) {
 
 // Remove data on specific client stored in session object
 static int removeClientDataFromSession(Client *client, Session *session) {
-    if (session->clients[session->numClients] == client) { // If the client is at the end just remove them
-        session->clients[session->numClients] = NULL;
+    if (session->clients[session->numClients - 1] == client) { // If the client is at the end just remove them
+        session->clients[session->numClients - 1] = NULL;
         --session->numClients;
     }
     else {  // Client is somewhere the session array so remove and update pointers
@@ -123,7 +145,7 @@ static int removeClientDataFromSession(Client *client, Session *session) {
             --session->numClients;
         }
         else { // Client somehow wasn't found in array despite the earlier function saying they are
-            fprintf(stderr, "Error: Client %s not found in session's list despite passing test at start!\n", client->name);
+            fprintf(stderr, "Error: Client \"%s\" not found in session's list despite passing test at start!\n", client->name);
             return -1; 
         }
     }
@@ -132,8 +154,8 @@ static int removeClientDataFromSession(Client *client, Session *session) {
 
 // Remove data on a session from a client's object
 static int removeSessionDataFromClient(Session *session, Client *client) {
-    if (client->sessions[client->numSessions] == session) { // If the session is at the end just remove them
-        session->clients[session->numClients] = NULL;
+    if (client->sessions[client->numSessions - 1] == session) { // If the session is at the end just remove them
+        session->clients[session->numClients - 1] = NULL;
         --session->numClients;
     }
     else { // Session is somewhere the client array so remove and update pointers
@@ -149,7 +171,7 @@ static int removeSessionDataFromClient(Session *session, Client *client) {
             --client->numSessions;
         }
         else { // Client somehow wasn't found in array despite the earlier function saying they are
-            fprintf(stderr, "Error: Session %s not found in client's list despite passing test at start!\n", session->name);
+            fprintf(stderr, "Error: Session \"%s\" not found in client's list despite passing test at start!\n", session->name);
             return -1; 
         }
     }
@@ -160,7 +182,7 @@ static int removeSessionDataFromClient(Session *session, Client *client) {
 static void deleteSession(Session *session) {
     assert(session->numClients == 0); // Ensure the session is empty
     assert(session != sessions->frontSession); // Ensure we're not deleting meta session
-    fprintf(stderr, "Deleting session %s\n", session->name);
+    fprintf(stderr, "Deleting session: %s\n", session->name);
     // Remove pointers to this session from the doubly linked list
     if (session == sessions->backSession) {  // If session is at end
         assert(session->nextSession == NULL);
