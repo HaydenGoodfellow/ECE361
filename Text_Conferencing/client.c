@@ -113,7 +113,7 @@ void *getResponse(void *sockfd) {
         if (msg->type == MESSAGE) {
             fprintf(stderr, "%s: %s\n", msg->source, msg->data);
         }
-        else{
+        else {
             evaluateResponse(msg);
         }
     }
@@ -138,7 +138,7 @@ message *parseInput(char *input) {
                 fprintf(stderr, "Invalid login string\n");
                 return NULL;
             }
-            fprintf(stderr, "User name: %s, Password: %s\n", clientID, password);
+            fprintf(stderr, "User name: %s Password: %s\n", clientID, password);
             strcpy(username, clientID);
             msg->type = LOGIN;
             msg->size = strlen(password);

@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
     assert(ret == 0);
 
     // Create meta session for people not in a session (Doesn't allow talking, only commands)
-    Session *metaSession = initSession("Not in a Session");
+    Session *metaSession = initSession("Meta Session");
     addSessionToList(metaSession);
     volatile int threadForMetaSession = 0;
 
@@ -145,7 +145,7 @@ void *pollSession(void *sessionPtr) {
             if (session->clientFds[i].revents & POLLIN) { // Got data from this client
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
                 recv(session->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
-                fprintf(stderr, "Received data from client: %s Data: %s\n", session->clients[i]->name, input);
+                fprintf(stderr, "Received data from client: %s. Data: %s\n", session->clients[i]->name, input);
                 message *msg = parseMessageAsString(input);
                 if (msg->type == MESSAGE) {
                     unsigned strLength = 0;
@@ -188,7 +188,7 @@ void *pollMetaSession(void *metaSessionPtr) {
             if (metaSession->clientFds[i].revents & POLLIN) { // Got data from this client
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
                 recv(metaSession->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
-                fprintf(stderr, "Received data from client: %s Data: %s\n", metaSession->clients[i]->name, input);
+                fprintf(stderr, "Received data from client: %s. Data: %s\n", metaSession->clients[i]->name, input);
                 message *msg = parseMessageAsString(input);
                 // Check if they're trying to do a command while not logged in
                 if (!metaSession->clients[i]->loggedIn && msg->type != LOGIN) {
@@ -360,10 +360,16 @@ void performCommand(message *msg, Session *session, Client *client) {
             for (sessionData = sessions->frontSession; sessionData != NULL; sessionData = sessionData->nextSession) {
                 if (sessionData->numClients == 0)
                     continue;
+                fprintf(stderr, "Printing query for session: %s. Num Clients: %d\n", sessionData->name, sessionData->numClients);
+                // Variables to store partially done string
                 int strLength = 0; 
                 char sessionInfo[512];
-                fprintf(stderr, "Printing query for session: %s Num Clients: %d\n", sessionData->name, sessionData->numClients);
-                strLength += sprintf(sessionInfo, "Session: %s\nUsers: \n", sessionData->name);
+                // Change format when listing users that are not in a session
+                if (sessionData == sessions->frontSession)
+                    strLength += sprintf(sessionInfo, "Users not in a session:\n");
+                else
+                    strLength += sprintf(sessionInfo, "Session: %s\nUsers: \n", sessionData->name);
+                // Add names of users in sessions on new lines
                 for (int j = 0; j < sessionData->numClients; ++j) {
                     strLength += sprintf(sessionInfo + strLength, "%s\n", sessionData->clients[j]->name);
                 }
@@ -375,7 +381,7 @@ void performCommand(message *msg, Session *session, Client *client) {
             break; 
             }
         case EXIT:
-            
+            // TODO
             break;
         default:
             break;
