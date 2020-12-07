@@ -24,7 +24,6 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Incorrect usage. Please invoke using \"server <TCP Listen Port>\"\n");
         return 0;
     }
-    fprintf(stderr, "In main1\n");
     char *portNum = argv[1];
     // Create socket and make it a listening socket
     int listenSock = establishConnection(portNum);
@@ -136,12 +135,14 @@ void *pollSession(void *sessionPtr) {
     fprintf(stderr, "In thread for session: %s\n", session->name);
     while (!session->sessionDeleted) {
         // TODO: Implement measures for when a client disconnects. Currently hangs server thread
-        unsigned numClients = session->numClients; 
-        int pollRet = poll(session->clientFds, numClients, 500); // Blocks, may change to timeout
+        unsigned numTalking; 
+        while (!(numTalking = session->numTalking))
+            ; // TODO: Make it not spin
+        int pollRet = poll(session->clientFds, numTalking, 500);
         if (pollRet == 0)
             continue;
         fprintf(stderr, "Received data on session \"%s\" socket. Num clients: %d\n", session->name, session->numClients);
-        for (int i = 0; i < numClients; ++i) {
+        for (int i = 0; i < numTalking; ++i) {
             if (session->clientFds[i].revents & POLLIN) { // Got data from this client
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
                 recv(session->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
@@ -151,11 +152,13 @@ void *pollSession(void *sessionPtr) {
                     unsigned strLength = 0;
                     char *output = messageToString(msg, &strLength);
                     fprintf(stderr, "Broadcasting message: %s\n", output);
-                    broadcastMessage(output, strLength, session, i);
+                    broadcastMessage(output, strLength, session, session->clientFds[i].fd);
                 }
                 else {
                     performCommand(msg, session, session->clients[i]);
                 }
+                free(input);
+                free(msg);
             }
         }
     }
@@ -203,6 +206,8 @@ void *pollMetaSession(void *metaSessionPtr) {
                 else {
                     performCommand(msg, metaSession, metaSession->clients[i]);
                 }
+                free(input);
+                free(msg);
             }
         }
     }
@@ -247,12 +252,12 @@ char *messageToString(message *msg, unsigned *size) {
 // Communication functions
 //==============================================//
 // Send message to all connected clients
-void broadcastMessage(char *messageAsString, unsigned strLength, Session *session, int sender) {
+void broadcastMessage(char *messageAsString, unsigned strLength, Session *session, int senderfd) {
     fprintf(stderr, "Sending message to %d clients in session: %s\n", session->numClients, session->name);
     for (int i = 0; i < session->numClients; ++i) {
-        if (i == sender)
+        if (session->clients[i]->clientfd == senderfd)
             continue;
-        send(session->clientFds[i].fd, messageAsString, strLength, 0);
+        send(session->clients[i]->clientfd, messageAsString, strLength, 0);
     }
     fprintf(stderr, "Completed sending message in session: %s\n", session->name);
 }
@@ -335,6 +340,7 @@ void performCommand(message *msg, Session *session, Client *client) {
         case JOIN_SESS: ; {
             Session *searchSession = searchForSession(msg->data);
             if (searchSession == NULL) {
+                fprintf(stderr, "Session named: \"%s\" does not exist\n", msg->data);
                 sendResponse(JOIN_SESS_NACK, "Session with that name does not exist!", client);
                 return;
             }
@@ -360,7 +366,7 @@ void performCommand(message *msg, Session *session, Client *client) {
             for (sessionData = sessions->frontSession; sessionData != NULL; sessionData = sessionData->nextSession) {
                 if (sessionData->numClients == 0)
                     continue;
-                fprintf(stderr, "Printing query for session: %s. Num Clients: %d\n", sessionData->name, sessionData->numClients);
+                // fprintf(stderr, "Printing query for session: %s. Num Clients: %d\n", sessionData->name, sessionData->numClients);
                 // Variables to store partially done string
                 int strLength = 0; 
                 char sessionInfo[512];

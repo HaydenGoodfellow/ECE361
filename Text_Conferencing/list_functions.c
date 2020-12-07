@@ -31,6 +31,7 @@ Session *initSession(char *sessionName) {
     for (int i = 0; i < MAX_CLIENTS_IN_SESSION; ++i) 
         newSession->clients[i] = NULL;
     newSession->numClients = 0;
+    newSession->numTalking = 0;
     newSession->nextSession = NULL;
     newSession->prevSession = NULL;
     newSession->sessionDeleted = 0;
@@ -58,7 +59,17 @@ void addSessionToList(Session *newSession) {
 
 // Add client to list and begin polling for data from that client
 void addClientToSession(Client *newClient, Session *session) {
+    // Check if the client is already in the session, if so change their talking to pointer
+    if (clientIsInSession(newClient, session)) {
+        fprintf(stderr, "Client \"%s\" is already in session \"%s\". Updating talking\n", newClient->name, session->name);
+        Session *oldSession = newClient->talkingToSession;
+        newClient->talkingToSession = session;
+        updatePollfds(session);
+        updatePollfds(oldSession);
+        return;
+    }
     bool addingToMetaSession = (sessions->frontSession == session);
+    fprintf(stderr, "Adding client %s to session %s\n", newClient->name, session->name);
     if ((newClient->numSessions < MAX_SESSIONS_PER_CLIENT) && (session->numClients < MAX_CLIENTS_IN_SESSION)) {
         if (!addingToMetaSession) { // We don't add the meta session's data to clients
             // Add session pointer to the client data
@@ -68,8 +79,12 @@ void addClientToSession(Client *newClient, Session *session) {
         }
         // Add client pointer to the session data
         session->clients[session->numClients] = newClient;
+        Session *oldSession = newClient->talkingToSession;
+        newClient->talkingToSession = session;
         ++session->numClients;
         updatePollfds(session);
+        if (oldSession != NULL && !addingToMetaSession)
+            updatePollfds(oldSession);
     }
     else if (newClient->numSessions > MAX_SESSIONS_PER_CLIENT) {
         fprintf(stderr, "Error adding session to client: Client is already in max number of sessions!\n");
@@ -93,9 +108,11 @@ void addClientToSession(Client *newClient, Session *session) {
 
 // Remove client from session list and the session from the clients list
 void removeClientFromSession(Client *client, Session *session) {
+    bool removeFromMetaSession = (sessions->frontSession == session);
     // Check if session is empty or NULL
     if (!session || (session->numClients == 0)) {
-        fprintf(stderr, "Error removing client: Session is empty or NULL\n");
+        if (!removeFromMetaSession)
+            fprintf(stderr, "Error removing client: Session is empty or NULL\n");
         return;
     }
     // First determine if they're in session
@@ -104,7 +121,6 @@ void removeClientFromSession(Client *client, Session *session) {
         return;
     }
     fprintf(stderr, "Removing client \"%s\" from session \"%s\" with num clients: %d\n", client->name, session->name, session->numClients);
-    bool removeFromMetaSession = (sessions->frontSession == session);
     // Remove client data from session
     int ret = removeClientDataFromSession(client, session);
     assert(ret == 0);
@@ -128,7 +144,7 @@ void removeClientFromSession(Client *client, Session *session) {
 
 // Remove data on specific client stored in session object
 static int removeClientDataFromSession(Client *client, Session *session) {
-    fprintf(stderr, "Removing data of client \"%s\" from session \"%s\"\n", client->name, session->name);
+    // fprintf(stderr, "Removing data of client \"%s\" from session \"%s\"\n", client->name, session->name);
     if (session->clients[session->numClients - 1] == client) { // If the client is at the end just remove them
         session->clients[session->numClients - 1] = NULL;
         --session->numClients;
@@ -155,9 +171,9 @@ static int removeClientDataFromSession(Client *client, Session *session) {
 
 // Remove data on a session from a client's object
 static int removeSessionDataFromClient(Session *session, Client *client) {
-    fprintf(stderr, "Removing data of session \"%s\" from client \"%s\" with numSessions %d\n", session->name, client->name, client->numSessions);
+    // fprintf(stderr, "Removing data of session \"%s\" from client \"%s\" with numSessions %d\n", session->name, client->name, client->numSessions);
     if (client->sessions[client->numSessions - 1] == session) { // If the session is at the end just remove them
-        fprintf(stderr, "Session is at back of client's list\n");
+        // fprintf(stderr, "Session is at back of client's list\n");
         client->sessions[client->numSessions - 1] = NULL;
         --client->numSessions;
     }
@@ -203,13 +219,22 @@ static void deleteSession(Session *session) {
 
 // Update the pollfds array to remove clients that left or include clients that joined
 void updatePollfds(Session *session) {
+    fprintf(stderr, "Updating pollfds for session %s\n", session->name);
+    if (session == NULL)
+        return;
     // Clear current fds array
     memset(session->clientFds, 0, sizeof(session->clientFds));
     // Add current clients to fds array
+    int arrayIndex = 0;
     for (int i = 0; i < session->numClients; ++i) {
-        session->clientFds[i].fd = session->clients[i]->clientfd;
-        session->clientFds[i].events = POLLIN;
+        if (session->clients[i]->talkingToSession == session) {
+            fprintf(stderr, "Client %s is talking in session %s\n", session->clients[i]->name, session->name);
+            session->clientFds[arrayIndex].fd = session->clients[i]->clientfd;
+            session->clientFds[arrayIndex].events = POLLIN;
+            ++arrayIndex;
+        }
     } 
+    session->numTalking = arrayIndex;
 }
 
 // Search for a session with a given name. Returns NULL if not found
@@ -233,6 +258,8 @@ Client *initClient(char *name, int clientfd) {
     newClient->password = NULL;
     newClient->loggedIn = false;
     newClient->clientfd = clientfd;
+    newClient->numSessions = 0;
+    newClient->talkingToSession = NULL;
     newClient->nextClient = NULL;
     newClient->prevClient = NULL;
     return newClient;

@@ -37,6 +37,8 @@ struct Client {
     // Array which stores pointers to the sessions which the client is in
     Session *sessions[MAX_SESSIONS_PER_CLIENT];
     unsigned numSessions;
+    // Session the client is currently sending messages to
+    Session *talkingToSession;
     // Pointers for the doubly linked list
     Client *nextClient;
     Client *prevClient;
@@ -58,6 +60,7 @@ struct Session {
     // Array which stores pointers to the client data stored in client list
     Client *clients[MAX_CLIENTS_IN_SESSION];
     unsigned numClients;
+    unsigned numTalking; // Number of clients currently sending to this session
     // Pointers for the doubly linked list
     Session *nextSession;
     Session *prevSession;
@@ -102,7 +105,7 @@ char *messageToString(message *msg, unsigned *size);
 // Communication functions (server.c)
 //==============================================//
 // Send message to all connected clients
-void broadcastMessage(char *messageAsString, unsigned strLength, Session *session, int sender);
+void broadcastMessage(char *messageAsString, unsigned strLength, Session *session, int senderfd);
 
 // Send message to specific client
 void sendResponse(messageTypes type, char *response, Client *client);

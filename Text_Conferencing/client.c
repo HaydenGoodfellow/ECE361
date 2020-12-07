@@ -85,6 +85,10 @@ int main(int argc, char **argv) {
         fgets(userInput, MAX_USER_INPUT_SIZE, stdin);
         // Strip newline character
         int length = strlen(userInput);
+        // char *endChar = userInput + length - 1;
+        // while ((endChar > userInput) && isspace((unsigned char)*endChar))
+        //     endChar--;
+        // endChar[1] = '\0';
         if ((length > 0) && (userInput[length - 1] == '\n')) {
             userInput[length - 1] = '\0';
             --length;
@@ -111,7 +115,7 @@ void *getResponse(void *sockfd) {
         response[bytesRecv] = '\0';
         message *msg = parseMessageAsString(response);
         if (msg->type == MESSAGE) {
-            fprintf(stderr, "%s: %s\n", msg->source, msg->data);
+            fprintf(stdout, "\r%s: %s\n", msg->source, msg->data);
         }
         else {
             evaluateResponse(msg);
@@ -150,6 +154,7 @@ message *parseInput(char *input) {
             msg->type = LOGOUT;
             msg->size = 0;
             strcpy(msg->source, username);
+            strcpy(msg->data, "\0");
             return msg;
         }
         else if (strncmp(input + 1, "createsession ", 14) == 0) {
@@ -182,12 +187,14 @@ message *parseInput(char *input) {
             msg->type = LEAVE_SESS;
             msg->size = 0;
             strcpy(msg->source, username);
+            strcpy(msg->data, "\0");
             return msg;
         }
         else if (strncmp(input + 1, "list", 4) == 0) {
             msg->type = QUERY;
             msg->size = 0;
             strcpy(msg->source, username);
+            strcpy(msg->data, "\0");
             return msg;
         }
         else if (strncmp(input + 1, "quit", 4) == 0) {
