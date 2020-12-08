@@ -139,9 +139,12 @@ void *pollSession(void *sessionPtr) {
         while (!(numTalking = session->numTalking))
             ; // TODO: Make it not spin
         // fprintf(stderr, "Polling session: %s. Num talking: %d\n", session->name, session->numTalking);
-        int pollRet = poll(session->clientFds, numTalking, 500);
-        if (pollRet == 0)
+        int pollRet = poll(session->clientFds, numTalking, 8000);
+        if (pollRet == 0){
+            printf("timer timeout!\n");
+            //exit
             continue;
+        }
         fprintf(stderr, "Received data on session \"%s\" socket. Num clients: %d. Num Talking:%d\n", session->name, session->numClients, numTalking);
         for (int i = 0; i < numTalking; ++i) {
             if (session->clientFds[i].revents & POLLIN) { // Got data from this client
@@ -187,9 +190,11 @@ void *pollMetaSession(void *metaSessionPtr) {
             fprintf(stderr, "Woke up in meta session thread\n");
         }
         unlock(&sessions->metaSessionLock);
-        int pollRet = poll(metaSession->clientFds, numClients, 500); // Blocks, may change to timeout
-        if (pollRet == 0)
+        int pollRet = poll(metaSession->clientFds, numClients, 8000); // Blocks, may change to timeout
+        if (pollRet == 0){
+            printf("timer timeout!\n");
             continue;
+        }
         fprintf(stderr, "Received data on meta session socket. Num clients: %d\n", metaSession->numClients);
         for (int i = 0; i < numClients; ++i) {
             if (metaSession->clientFds[i].revents & POLLIN) { // Got data from this client
