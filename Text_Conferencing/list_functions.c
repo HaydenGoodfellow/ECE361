@@ -305,6 +305,17 @@ void addClientToList(Client *newClient) {
     ++clients->numClients;
 }
 
+// Get a client's object from a session given their socket file descriptor
+Client *getClientByFd(int clientfd, Session *session) {
+    if (!session->numClients || !session->clients)
+        return NULL;
+    for (unsigned i = 0; i < session->numClients; ++i) {
+        if (session->clients[i]->clientfd == clientfd)
+            return session->clients[i];
+    }
+    return NULL;
+}
+
 // Search for a client in a specifc session. Returns false if not found
 bool clientIsInSession(Client *client, Session *session) {
     if (session->numClients == 0)

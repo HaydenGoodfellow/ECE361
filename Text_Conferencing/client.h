@@ -19,6 +19,7 @@
 
 #define MAX_USER_INPUT_SIZE 2048
 #define MAX_SOCKET_INPUT_SIZE 2048
+#define MAX_NAME 64 // bytes/characters
 
 void *getResponse(void *sockfd);
 

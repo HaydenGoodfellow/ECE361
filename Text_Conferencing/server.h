@@ -147,6 +147,9 @@ Client *initClient(char *name, int clientfd);
 // Add session to the end of the linked list of clients
 void addClientToList(Client *newClient);
 
+// Get a client's object from a session given their socket file descriptor
+Client *getClientByFd(int clientfd, Session *session);
+
 // Search for a client in a specifc session. Returns false if not found
 bool clientIsInSession(Client *client, Session *session);
 

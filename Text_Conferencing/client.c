@@ -109,15 +109,21 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+// Variable to store current session name (global for threads)
+char currentSessionName[64];
+
 void *getResponse(void *sockfd) {
     char response[MAX_SOCKET_INPUT_SIZE];
+    strcpy(currentSessionName, "");
     while (true) {
+        if (strlen(currentSessionName))
+            fprintf(stderr, "\r(%s) ", currentSessionName);
         // Receive message back from server
         int bytesRecv = recv(*((int *)sockfd), response, MAX_SOCKET_INPUT_SIZE, 0);
         response[bytesRecv] = '\0';
         message *msg = parseMessageAsString(response);
-        if (msg->type == MESSAGE) {
-            fprintf(stdout, "(%s) %s: %s\n", msg->session, msg->source, msg->data);
+        if (msg->type == MESSAGE) { // These spaces are needed cause I don't want to use ncurses
+            fprintf(stdout, "\r(%s) %s: %s                                             \n", msg->session, msg->source, msg->data);
         }
         else {
             evaluateResponse(msg);
@@ -264,6 +270,8 @@ message *parseMessageAsString(char *input) {
 void evaluateResponse(message* msg) {
     // fprintf(stderr, "Evaluating response\n");
     switch (msg->type) {
+        case MESSAGE_ACK:
+            break;
         case MESSAGE_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
@@ -280,25 +288,29 @@ void evaluateResponse(message* msg) {
             fprintf(stderr, "%s\n", msg->data);
             break;
         case NEW_SESS_ACK:
-            fprintf(stderr, "Session created successfully.\n");
+            fprintf(stderr, "Session %s created successfully.\n", msg->data);
+            strcpy(currentSessionName, msg->data);
             break;
         case NEW_SESS_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
         case JOIN_SESS_ACK:
-            fprintf(stderr, "Successfully joined session.\n");
+            fprintf(stderr, "Successfully joined session %s\n", msg->data);
+            strcpy(currentSessionName, msg->data);
             break;
         case JOIN_SESS_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
         case LEAVE_SESS_ACK:
             fprintf(stderr, "Successfully left session.\n");
+            strcpy(currentSessionName, "");
             break;
         case LEAVE_SESS_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
         case SWITCH_SESS:
-            fprintf(stderr, "%s\n", msg->data);
+            fprintf(stderr, "Switched to talking in session: %s\n", msg->data);
+            strcpy(currentSessionName, msg->data);
             break;
         case QUERY_ACK:
             fprintf(stderr, "%s", msg->data);
