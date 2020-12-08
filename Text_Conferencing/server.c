@@ -300,6 +300,14 @@ void performCommand(message *msg, Session *session, Client *client) {
         case LOGIN: {
             // TODO: Implement checking username and password
             if (!client->loggedIn) {
+                // Check if its a valid login
+                char *errorMsg = malloc(sizeof(char) * 64);
+                bool validLogin = checkValidLogin(msg->source, msg->data, errorMsg);
+                if (!validLogin) {
+                    fprintf(stderr, "Invalid login. Sending error: %s\n", errorMsg);
+                    sendResponse(LOGIN_NACK, errorMsg, client);
+                    return;
+                }
                 // Free "Unknown" name currently in client
                 free(client->name);
                 // Save username
@@ -418,3 +426,4 @@ void performCommand(message *msg, Session *session, Client *client) {
             break;
     }
 }
+

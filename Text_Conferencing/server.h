@@ -153,5 +153,13 @@ Client *getClientByFd(int clientfd, Session *session);
 // Search for a client in a specifc session. Returns false if not found
 bool clientIsInSession(Client *client, Session *session);
 
+// Find client with a given name if they're logged in currently logged in
+Client *clientExists(char *name);
+
+//==============================================//
+// Functions for checking logins (login_functions.c)
+//==============================================//
+// Ensure that the user information given matches what is store in database
+bool checkValidLogin(char* clientID, char* password, char *error);
 
 #endif // SERVER_H

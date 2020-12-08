@@ -326,3 +326,14 @@ bool clientIsInSession(Client *client, Session *session) {
     }
     return false;
 }
+
+// Check if a client with a given name is currently logged in
+Client *clientExists(char *name) {
+    if (name == NULL)
+        return NULL;
+    for (Client *search = clients->frontClient; search != NULL; search = search->nextClient) {
+        if ((strcmp(search->name, name)) == 0 && (search->loggedIn)) 
+            return search;
+    }
+    return NULL;
+}

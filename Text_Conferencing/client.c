@@ -1,5 +1,4 @@
 #include "client.h"
-#include "login.h"
 // Parts of this code was adapted from Beej's Guide to Network Programming
 // Found online at: https://beej.us/guide/bgnet/html/
 
@@ -33,13 +32,8 @@ int main(int argc, char **argv) {
         password = strtok(NULL, " ");
         serverIP = strtok(NULL, " ");
         port = strtok(NULL, " ");
-        bool userExist = checkUser(clientID, password);
         if (!command || !clientID || !password || !serverIP || !port) {
             fprintf(stderr, "Invalid input, please try again\n");
-            continue;
-        }
-        if (!userExist){
-            fprintf(stderr, "Invalid user name or password, please try again\n");
             continue;
         }
         validInput = true;
@@ -323,15 +317,4 @@ void evaluateResponse(message* msg) {
         default:
             break;
     }
-}
-
-bool checkUser(char* clientID, char* password){
-    int total_users = sizeof(AllUsers)/sizeof(users);
-    for (int i = 0; i<total_users; i++){
-        if (strcmp(clientID, AllUsers[i].userName) == 0 && 
-            strcmp(password, AllUsers[i].userPassword) == 0){
-            return true;
-        }
-    }
-    return false;    
 }
