@@ -152,6 +152,7 @@ void *pollSession(void *sessionPtr) {
                 message *msg = parseMessageAsString(input);
                 if (msg->type == MESSAGE) {
                     unsigned strLength = 0;
+                    strcpy(msg->session, session->name);
                     char *output = messageToString(msg, &strLength);
                     fprintf(stderr, "Broadcasting message: %s\n", output);
                     broadcastMessage(output, strLength, session, session->clientFds[i].fd);
@@ -224,12 +225,14 @@ void *pollMetaSession(void *metaSessionPtr) {
 message *parseMessageAsString(char *input) {
     char *type = strtok(input, ":");
     char *size = strtok(NULL, ":");
+    char *session = strtok(NULL, ":");
     char *source = strtok(NULL, ":");
     char *data = strtok(NULL, "\0");
-    // fprintf(stderr, "Type: %s. Size: %s. Source: %s Data: %s\n", type, size, source, (data ? data : ""));
+    fprintf(stderr, "Type: %s. Size: %s. Session: %s. Source: %s Data: %s\n", type, size, session, source, (data ? data : ""));
     message *msg = malloc(sizeof(message));
     msg->type = atoi(type);
     msg->size = atoi(size);
+    strcpy(msg->session, session);
     strcpy(msg->source, source);
     strncpy(msg->data, data, msg->size);
     msg->data[msg->size] = '\0';
@@ -242,8 +245,8 @@ char *messageToString(message *msg, unsigned *size) {
     // Allocate on heap a string with enough size for everything but data
     char *result = (char *)malloc(sizeof(char) * 100);
     // Print everything but data into the string
-    bytesPrinted = snprintf(result, 100, "%d:%u:%s:", msg->type, msg->size, msg->source);
-    // fprintf(stderr, "String without data: %s\nLength: %lu\n", result, strlen(result));
+    bytesPrinted = snprintf(result, 100, "%d:%u:%s:%s:", msg->type, msg->size, msg->session, msg->source);
+    fprintf(stderr, "String without data: %s\nLength: %lu\n", result, strlen(result));
     // Resize string to have space to store data
     result = (char *)realloc(result, bytesPrinted + msg->size);
     // Inserts data where snprintf put '\0'
@@ -272,6 +275,7 @@ void sendResponse(messageTypes type, char *response, Client *client) {
     message *msg = malloc(sizeof(message));
     msg->type = type;
     msg->size = strlen(response);
+    strcpy(msg->session, "Server");
     strcpy(msg->source, "Server");
     if (strlen(response) >= 1)
         strcpy(msg->data, response);

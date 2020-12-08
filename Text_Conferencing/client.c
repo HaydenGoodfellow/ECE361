@@ -117,7 +117,7 @@ void *getResponse(void *sockfd) {
         response[bytesRecv] = '\0';
         message *msg = parseMessageAsString(response);
         if (msg->type == MESSAGE) {
-            fprintf(stdout, "\r%s: %s\n", msg->source, msg->data);
+            fprintf(stdout, "(%s) %s: %s\n", msg->session, msg->source, msg->data);
         }
         else {
             evaluateResponse(msg);
@@ -148,6 +148,7 @@ message *parseInput(char *input) {
             strcpy(username, clientID);
             msg->type = LOGIN;
             msg->size = strlen(password);
+            strcpy(msg->session, " ");
             strcpy(msg->source, username);
             strcpy(msg->data, password);
             return msg;
@@ -155,6 +156,7 @@ message *parseInput(char *input) {
         else if (strncmp(input + 1, "logout", 6) == 0) {
             msg->type = LOGOUT;
             msg->size = 0;
+            strcpy(msg->session, " ");
             strcpy(msg->source, username);
             strcpy(msg->data, "\0");
             return msg;
@@ -168,6 +170,7 @@ message *parseInput(char *input) {
             }
             msg->type = NEW_SESS;
             msg->size = strlen(sessionID);
+            strcpy(msg->session, " ");
             strcpy(msg->source, username);
             strcpy(msg->data, sessionID);
             return msg;
@@ -181,6 +184,7 @@ message *parseInput(char *input) {
             }
             msg->type = JOIN_SESS;
             msg->size = strlen(sessionID);
+            strcpy(msg->session, " ");
             strcpy(msg->source, username);
             strcpy(msg->data, sessionID);
             return msg;
@@ -188,6 +192,7 @@ message *parseInput(char *input) {
         else if (strncmp(input + 1, "leavesession", 12) == 0) {
             msg->type = LEAVE_SESS;
             msg->size = 0;
+            strcpy(msg->session, " ");
             strcpy(msg->source, username);
             strcpy(msg->data, "\0");
             return msg;
@@ -195,6 +200,7 @@ message *parseInput(char *input) {
         else if (strncmp(input + 1, "list", 4) == 0) {
             msg->type = QUERY;
             msg->size = 0;
+            strcpy(msg->session, " ");
             strcpy(msg->source, username);
             strcpy(msg->data, "\0");
             return msg;
@@ -210,6 +216,7 @@ message *parseInput(char *input) {
     else  { // Message
         msg->type = MESSAGE;
         msg->size = strlen(input);
+        strcpy(msg->session, " ");
         strcpy(msg->source, username);
         strcpy(msg->data, input);
         return msg;
@@ -222,7 +229,7 @@ char *messageToString(message *msg, unsigned *size) {
     // Allocate on heap a string with enough size for everything but data
     char *result = (char *)malloc(sizeof(char) * 100);
     // Print everything but data into the string
-    bytesPrinted = snprintf(result, 100, "%d:%u:%s:", msg->type, msg->size, msg->source);
+    bytesPrinted = snprintf(result, 100, "%d:%u:%s:%s:", msg->type, msg->size, msg->session, msg->source);
     // fprintf(stderr, "String without data: %s\nLength: %lu\n", result, strlen(result));
     // Resize string to have space to store data
     result = (char *)realloc(result, bytesPrinted + msg->size);
@@ -236,16 +243,21 @@ char *messageToString(message *msg, unsigned *size) {
     return result;
 }
 
+// Converts string from socket to message type for analysis
 message *parseMessageAsString(char *input) {
     char *type = strtok(input, ":");
     char *size = strtok(NULL, ":");
+    char *session = strtok(NULL, ":");
     char *source = strtok(NULL, ":");
-    unsigned dataIndex = 3 + strlen(type) + strlen(size) + strlen(source);
+    char *data = strtok(NULL, "\0");
+    // fprintf(stderr, "Type: %s. Size: %s. Session: %s. Source: %s Data: %s\n", type, size, session, source, (data ? data : ""));
     message *msg = malloc(sizeof(message));
     msg->type = atoi(type);
     msg->size = atoi(size);
+    strcpy(msg->session, session);
     strcpy(msg->source, source);
-    strncpy(msg->data, input + dataIndex, msg->size);
+    strncpy(msg->data, data, msg->size);
+    msg->data[msg->size] = '\0';
     return msg;
 }
 

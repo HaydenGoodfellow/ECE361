@@ -31,6 +31,7 @@ typedef enum messageTypes {
 typedef struct message {
     messageTypes type;
     unsigned size;
+    char session[MAX_NAME];
     char source[MAX_NAME];
     char data[MAX_DATA];
 } message;
