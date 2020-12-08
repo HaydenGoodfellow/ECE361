@@ -39,6 +39,7 @@ struct Client {
     unsigned numSessions;
     // Session the client is currently sending messages to
     Session *talkingToSession;
+    Session *prevTalkingTo; // Session it was talking to last
     // Pointers for the doubly linked list
     Client *nextClient;
     Client *prevClient;

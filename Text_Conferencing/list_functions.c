@@ -64,6 +64,7 @@ void addClientToSession(Client *newClient, Session *session) {
         fprintf(stderr, "Client \"%s\" is already in session \"%s\". Updating talking\n", newClient->name, session->name);
         Session *oldSession = newClient->talkingToSession;
         newClient->talkingToSession = session;
+        newClient->prevTalkingTo = oldSession;
         updatePollfds(session);
         updatePollfds(oldSession);
         return;
@@ -79,8 +80,13 @@ void addClientToSession(Client *newClient, Session *session) {
         }
         // Add client pointer to the session data
         session->clients[session->numClients] = newClient;
+        if (newClient->talkingToSession)
+            fprintf(stderr, "Currently talking to: %s\n", newClient->talkingToSession->name);
         Session *oldSession = newClient->talkingToSession;
         newClient->talkingToSession = session;
+        newClient->prevTalkingTo = oldSession;
+        if (newClient->prevTalkingTo)
+            fprintf(stderr, "New session: %s. Old session: %s\n", newClient->talkingToSession->name, newClient->prevTalkingTo->name);
         ++session->numClients;
         updatePollfds(session);
         if (oldSession != NULL && !addingToMetaSession)
@@ -117,7 +123,8 @@ void removeClientFromSession(Client *client, Session *session) {
     }
     // First determine if they're in session
     if (!clientIsInSession(client, session)) {
-        fprintf(stderr, "Error removing client: Client \"%s\" is not in session \"%s\"\n", client->name, session == sessions->frontSession ? "Meta Session" : session->name);
+        if (!removeFromMetaSession)
+            fprintf(stderr, "Error removing client: Client \"%s\" is not in session \"%s\"\n", client->name, session->name);
         return;
     }
     fprintf(stderr, "Removing client \"%s\" from session \"%s\" with num clients: %d\n", client->name, session->name, session->numClients);
@@ -131,6 +138,20 @@ void removeClientFromSession(Client *client, Session *session) {
         if (client->numSessions == 0) { // If its in no sessions add it to the meta one
             fprintf(stderr, "Adding client \"%s\" back to meta sessions as they are no longer in any sessions\n", client->name);
             addClientToSession(client, sessions->frontSession);
+            client->prevTalkingTo = NULL;
+        }
+        else { // Switch who the client is talking to
+            if (client->prevTalkingTo) {
+                fprintf(stderr, "Switching client \"%s\" to talk in session %s\n", client->name, client->prevTalkingTo->name);
+                client->talkingToSession = client->prevTalkingTo;
+                client->prevTalkingTo = NULL;
+            }
+            else {
+                fprintf(stderr, "Switching client \"%s\" with no previous session to talk in session %s\n", client->name, client->sessions[client->numSessions - 1]->name);
+                client->talkingToSession = client->sessions[client->numSessions - 1];
+                client->prevTalkingTo = NULL;
+            }
+            updatePollfds(client->talkingToSession);
         }
     }
     // If session is empty and not the meta session then we delete it
@@ -139,7 +160,7 @@ void removeClientFromSession(Client *client, Session *session) {
         return;
     }
     // Update the fds to no longer poll from removed client
-    updatePollfds(session);
+    updatePollfds(session);    
 }
 
 // Remove data on specific client stored in session object
@@ -219,22 +240,23 @@ static void deleteSession(Session *session) {
 
 // Update the pollfds array to remove clients that left or include clients that joined
 void updatePollfds(Session *session) {
-    fprintf(stderr, "Updating pollfds for session %s\n", session->name);
     if (session == NULL)
         return;
+    fprintf(stderr, "Updating pollfds for session %s. Clients talking: ", session->name);
     // Clear current fds array
     memset(session->clientFds, 0, sizeof(session->clientFds));
     // Add current clients to fds array
     int arrayIndex = 0;
     for (int i = 0; i < session->numClients; ++i) {
         if (session->clients[i]->talkingToSession == session) {
-            fprintf(stderr, "Client %s is talking in session %s\n", session->clients[i]->name, session->name);
+            fprintf(stderr, "%s ", session->clients[i]->name);
             session->clientFds[arrayIndex].fd = session->clients[i]->clientfd;
             session->clientFds[arrayIndex].events = POLLIN;
             ++arrayIndex;
         }
     } 
     session->numTalking = arrayIndex;
+    fprintf(stderr, "\nNum talking in session %s: %d\n", session->name, session->numTalking);
 }
 
 // Search for a session with a given name. Returns NULL if not found
@@ -260,6 +282,7 @@ Client *initClient(char *name, int clientfd) {
     newClient->clientfd = clientfd;
     newClient->numSessions = 0;
     newClient->talkingToSession = NULL;
+    newClient->prevTalkingTo = NULL;
     newClient->nextClient = NULL;
     newClient->prevClient = NULL;
     return newClient;

@@ -102,6 +102,8 @@ int main(int argc, char **argv) {
         // Send message to server
         // fprintf(stderr, "Sending data: %s\n", msgAsString);
         sendto(sockfd, msgAsString, strLength, MSG_CONFIRM, serverInfo->ai_addr, serverInfo->ai_addrlen);
+        memset(userInput, '\0', MAX_USER_INPUT_SIZE);
+        free(msg);
     }
     close(sockfd);
     return 0;
@@ -226,10 +228,10 @@ char *messageToString(message *msg, unsigned *size) {
     result = (char *)realloc(result, bytesPrinted + msg->size);
     // Inserts data where snprintf put '\0'
     memcpy(result + bytesPrinted, msg->data, msg->size);
-    // fprintf(stderr, "String with data: ");
-    // for (int i = 0; i < bytesPrinted + msg->size; ++i)
-    //     fprintf(stderr, "%c", result[i]);
-    // fprintf(stderr, "\nLength: %d\n", bytesPrinted + msg->size);
+    fprintf(stderr, "String with data: ");
+    for (int i = 0; i < bytesPrinted + msg->size; ++i)
+        fprintf(stderr, "%c", result[i]);
+    fprintf(stderr, "\nLength: %d\n", bytesPrinted + msg->size);
     *size = bytesPrinted + msg->size;
     return result;
 }

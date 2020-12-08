@@ -138,6 +138,7 @@ void *pollSession(void *sessionPtr) {
         unsigned numTalking; 
         while (!(numTalking = session->numTalking))
             ; // TODO: Make it not spin
+        fprintf(stderr, "Polling session: %s. Num talking: %d\n", session->name, session->numTalking);
         int pollRet = poll(session->clientFds, numTalking, 500);
         if (pollRet == 0)
             continue;
@@ -145,9 +146,11 @@ void *pollSession(void *sessionPtr) {
         for (int i = 0; i < numTalking; ++i) {
             if (session->clientFds[i].revents & POLLIN) { // Got data from this client
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
-                recv(session->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
-                fprintf(stderr, "Received data from client: %s. Data: %s\n", session->clients[i]->name, input);
+                int bytesRecv = recv(session->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
+                input[bytesRecv] = '\0';
+                fprintf(stderr, "Received data from client num: %d. Data: %s\n", i, input);
                 message *msg = parseMessageAsString(input);
+                fprintf(stderr, "Message->data: %s\n", msg->data);
                 if (msg->type == MESSAGE) {
                     unsigned strLength = 0;
                     char *output = messageToString(msg, &strLength);
@@ -190,9 +193,12 @@ void *pollMetaSession(void *metaSessionPtr) {
         for (int i = 0; i < numClients; ++i) {
             if (metaSession->clientFds[i].revents & POLLIN) { // Got data from this client
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
-                recv(metaSession->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
-                fprintf(stderr, "Received data from client: %s. Data: %s\n", metaSession->clients[i]->name, input);
+                int bytesRecv = recv(metaSession->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
+                input[bytesRecv] = '\0';
+                fprintf(stderr, "Received data in meta session from client num: %d. Data: %s\n", i, input);
                 message *msg = parseMessageAsString(input);
+                if (msg->data)
+                    fprintf(stderr, "Message->data: %s\n", msg->data);
                 // Check if they're trying to do a command while not logged in
                 if (!metaSession->clients[i]->loggedIn && msg->type != LOGIN) {
                     char response[] = "You must log in first!";
@@ -222,12 +228,16 @@ message *parseMessageAsString(char *input) {
     char *type = strtok(input, ":");
     char *size = strtok(NULL, ":");
     char *source = strtok(NULL, ":");
-    unsigned dataIndex = 3 + strlen(type) + strlen(size) + strlen(source);
+    char *data = strtok(NULL, "\0");
+    fprintf(stderr, "Type: %s. Size: %s. Source: %s Data: %s\n", type, size, source, (data ? data : ""));
+    // unsigned dataIndex = 3 + strlen(type) + strlen(size) + strlen(source);
     message *msg = malloc(sizeof(message));
     msg->type = atoi(type);
     msg->size = atoi(size);
     strcpy(msg->source, source);
-    strncpy(msg->data, input + dataIndex, msg->size);
+    strncpy(msg->data, data, msg->size);
+    msg->data[msg->size] = '\0';
+    // strncpy(msg->data, input + dataIndex, msg->size);
     return msg;
 }
 
