@@ -228,10 +228,10 @@ char *messageToString(message *msg, unsigned *size) {
     result = (char *)realloc(result, bytesPrinted + msg->size);
     // Inserts data where snprintf put '\0'
     memcpy(result + bytesPrinted, msg->data, msg->size);
-    fprintf(stderr, "String with data: ");
-    for (int i = 0; i < bytesPrinted + msg->size; ++i)
-        fprintf(stderr, "%c", result[i]);
-    fprintf(stderr, "\nLength: %d\n", bytesPrinted + msg->size);
+    // fprintf(stderr, "String with data: ");
+    // for (int i = 0; i < bytesPrinted + msg->size; ++i)
+    //     fprintf(stderr, "%c", result[i]);
+    // fprintf(stderr, "\nLength: %d\n", bytesPrinted + msg->size);
     *size = bytesPrinted + msg->size;
     return result;
 }
@@ -279,14 +279,17 @@ void evaluateResponse(message* msg) {
         case JOIN_SESS_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
-        case QUERY_ACK:
-            fprintf(stderr, "%s", msg->data);
-            break;
         case LEAVE_SESS_ACK:
             fprintf(stderr, "Successfully left session.\n");
             break;
         case LEAVE_SESS_NACK:
             fprintf(stderr, "%s\n", msg->data);
+            break;
+        case SWITCH_SESS:
+            fprintf(stderr, "%s\n", msg->data);
+            break;
+        case QUERY_ACK:
+            fprintf(stderr, "%s", msg->data);
             break;
         default:
             break;

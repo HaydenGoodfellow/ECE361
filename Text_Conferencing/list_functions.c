@@ -74,19 +74,17 @@ void addClientToSession(Client *newClient, Session *session) {
     if ((newClient->numSessions < MAX_SESSIONS_PER_CLIENT) && (session->numClients < MAX_CLIENTS_IN_SESSION)) {
         if (!addingToMetaSession) { // We don't add the meta session's data to clients
             // Add session pointer to the client data
-            fprintf(stderr, "Adding session \"%s\" data to client \"%s\"\n", session->name, newClient->name);
+            // fprintf(stderr, "Adding session \"%s\" data to client \"%s\"\n", session->name, newClient->name);
             newClient->sessions[newClient->numSessions] = session;
             ++newClient->numSessions;
         }
         // Add client pointer to the session data
         session->clients[session->numClients] = newClient;
-        if (newClient->talkingToSession)
-            fprintf(stderr, "Currently talking to: %s\n", newClient->talkingToSession->name);
         Session *oldSession = newClient->talkingToSession;
         newClient->talkingToSession = session;
         newClient->prevTalkingTo = oldSession;
         if (newClient->prevTalkingTo)
-            fprintf(stderr, "New session: %s. Old session: %s\n", newClient->talkingToSession->name, newClient->prevTalkingTo->name);
+            fprintf(stderr, "Client %s talking to: %s. Old talking to: %s\n", newClient->name, newClient->talkingToSession->name, newClient->prevTalkingTo->name);
         ++session->numClients;
         updatePollfds(session);
         if (oldSession != NULL && !addingToMetaSession)
@@ -99,10 +97,10 @@ void addClientToSession(Client *newClient, Session *session) {
         fprintf(stderr, "Error adding client: Session is full!\n");
     }
     // If client is in a session they can't also be in the meta session
-    if (!addingToMetaSession) {
+    if (!addingToMetaSession && clientIsInSession(newClient, sessions->frontSession)) {
         removeClientFromSession(newClient, sessions->frontSession);
     }
-    else {
+    else if (addingToMetaSession) { 
         lock(&sessions->metaSessionLock);
         // Signal that the meta session has clients in case the thread is sleeping
         signal_cond(&sessions->metaSessionHasMembers);

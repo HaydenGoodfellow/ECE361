@@ -138,7 +138,7 @@ void *pollSession(void *sessionPtr) {
         unsigned numTalking; 
         while (!(numTalking = session->numTalking))
             ; // TODO: Make it not spin
-        fprintf(stderr, "Polling session: %s. Num talking: %d\n", session->name, session->numTalking);
+        // fprintf(stderr, "Polling session: %s. Num talking: %d\n", session->name, session->numTalking);
         int pollRet = poll(session->clientFds, numTalking, 500);
         if (pollRet == 0)
             continue;
@@ -150,7 +150,6 @@ void *pollSession(void *sessionPtr) {
                 input[bytesRecv] = '\0';
                 fprintf(stderr, "Received data from client num: %d. Data: %s\n", i, input);
                 message *msg = parseMessageAsString(input);
-                fprintf(stderr, "Message->data: %s\n", msg->data);
                 if (msg->type == MESSAGE) {
                     unsigned strLength = 0;
                     char *output = messageToString(msg, &strLength);
@@ -165,7 +164,7 @@ void *pollSession(void *sessionPtr) {
             }
         }
     }
-    fprintf(stderr, "Freeing data and exiting thread for session: %s\n", session->name);
+    // fprintf(stderr, "Freeing data and exiting thread for session: %s\n", session->name);
     // Session was deleted so we need to free session and its data
     free(session->name);
     free(session->thread); // Is this even legal?
@@ -197,8 +196,6 @@ void *pollMetaSession(void *metaSessionPtr) {
                 input[bytesRecv] = '\0';
                 fprintf(stderr, "Received data in meta session from client num: %d. Data: %s\n", i, input);
                 message *msg = parseMessageAsString(input);
-                if (msg->data)
-                    fprintf(stderr, "Message->data: %s\n", msg->data);
                 // Check if they're trying to do a command while not logged in
                 if (!metaSession->clients[i]->loggedIn && msg->type != LOGIN) {
                     char response[] = "You must log in first!";
@@ -229,15 +226,13 @@ message *parseMessageAsString(char *input) {
     char *size = strtok(NULL, ":");
     char *source = strtok(NULL, ":");
     char *data = strtok(NULL, "\0");
-    fprintf(stderr, "Type: %s. Size: %s. Source: %s Data: %s\n", type, size, source, (data ? data : ""));
-    // unsigned dataIndex = 3 + strlen(type) + strlen(size) + strlen(source);
+    // fprintf(stderr, "Type: %s. Size: %s. Source: %s Data: %s\n", type, size, source, (data ? data : ""));
     message *msg = malloc(sizeof(message));
     msg->type = atoi(type);
     msg->size = atoi(size);
     strcpy(msg->source, source);
     strncpy(msg->data, data, msg->size);
     msg->data[msg->size] = '\0';
-    // strncpy(msg->data, input + dataIndex, msg->size);
     return msg;
 }
 
@@ -269,7 +264,7 @@ void broadcastMessage(char *messageAsString, unsigned strLength, Session *sessio
             continue;
         send(session->clients[i]->clientfd, messageAsString, strLength, 0);
     }
-    fprintf(stderr, "Completed sending message in session: %s\n", session->name);
+    // fprintf(stderr, "Completed sending message in session: %s\n", session->name);
 }
 
 // Send message to specific client
@@ -288,10 +283,11 @@ void sendResponse(messageTypes type, char *response, Client *client) {
 // Perform command given by a client
 void performCommand(message *msg, Session *session, Client *client) {
     switch (msg->type) {
-        case MESSAGE:
+        case MESSAGE: {
             fprintf(stderr, "Error: Message of type message being sent to parse command!\n");
             break;
-        case LOGIN:
+        }
+        case LOGIN: {
             // TODO: Implement checking username and password
             // TODO: Solve problem when client is in multiple sessions so it does command multiple times
             if (!client->loggedIn) {
@@ -312,7 +308,8 @@ void performCommand(message *msg, Session *session, Client *client) {
                 sendResponse(LOGIN_NACK, "Error: You are already logged in!", client);
             }
             break;
-        case LOGOUT:
+        }
+        case LOGOUT: {
             if (client->loggedIn) {
                 // Free username
                 free(client->name);
@@ -330,7 +327,8 @@ void performCommand(message *msg, Session *session, Client *client) {
                 sendResponse(LOGOUT_NACK, "Error: You are not logged in!", client);
             }
             break;
-        case NEW_SESS: ; {
+        }
+        case NEW_SESS: { ;
             // Check if session with that name already exists
             Session *searchSession = searchForSession(msg->data);
             if (searchSession != NULL) {
@@ -346,8 +344,8 @@ void performCommand(message *msg, Session *session, Client *client) {
             newSession->thread = malloc(sizeof(pthread_t));
             pthread_create((pthread_t *) newSession->thread, NULL, (void *) pollSession, (void *) newSession);
             break; 
-            }
-        case JOIN_SESS: ; {
+        }
+        case JOIN_SESS: { ;
             Session *searchSession = searchForSession(msg->data);
             if (searchSession == NULL) {
                 fprintf(stderr, "Session named: \"%s\" does not exist\n", msg->data);
@@ -359,8 +357,8 @@ void performCommand(message *msg, Session *session, Client *client) {
             sendResponse(JOIN_SESS_ACK, "", client);
             assert(searchSession->thread != NULL);
             break; 
-            }
-        case LEAVE_SESS:
+        }
+        case LEAVE_SESS: {
             if (client->numSessions == 0) { // Only in the meta session
                 sendResponse(LEAVE_SESS_NACK, "You're not in a session to leave!", client);
                 return;
@@ -368,9 +366,17 @@ void performCommand(message *msg, Session *session, Client *client) {
             // Removes client from the session and deletes session if it is empty
             removeClientFromSession(client, session);
             sendResponse(LEAVE_SESS_ACK, "", client);
+            if (client->talkingToSession != sessions->frontSession) { // Inform client which session theyve switched into
+                unsigned responseLen = snprintf(NULL, 0, "Switched to talking in session: %s", client->talkingToSession->name); 
+                char response[responseLen + 1];
+                sprintf(response, "Switched to talking in session: %s", client->talkingToSession->name);
+                sendResponse(SWITCH_SESS, response, client);
+            }
             break;
-        case QUERY: ; {
+        }
+        case QUERY: { ;
             char *result = malloc(sizeof(char) * 2048);
+            memset(result, '\0', 2048);
             strcat(result, "\%========================================\%\n");
             Session *sessionData;
             for (sessionData = sessions->frontSession; sessionData != NULL; sessionData = sessionData->nextSession) {
@@ -395,7 +401,7 @@ void performCommand(message *msg, Session *session, Client *client) {
             sendResponse(QUERY_ACK, result, client);
             free(result);
             break; 
-            }
+        }
         case EXIT:
             // TODO
             break;

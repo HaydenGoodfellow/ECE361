@@ -23,6 +23,7 @@ typedef enum messageTypes {
     LEAVE_SESS,
     LEAVE_SESS_ACK,
     LEAVE_SESS_NACK,
+    SWITCH_SESS,
     QUERY,
     QUERY_ACK
 } messageTypes;
