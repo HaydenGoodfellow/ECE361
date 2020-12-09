@@ -14,7 +14,6 @@ typedef enum messageTypes {
     LOGOUT,
     LOGOUT_ACK,
     LOGOUT_NACK,
-    EXIT,
     NEW_SESS,
     NEW_SESS_ACK,
     NEW_SESS_NACK,
@@ -26,7 +25,14 @@ typedef enum messageTypes {
     LEAVE_SESS_NACK,
     SWITCH_SESS,
     QUERY,
-    QUERY_ACK
+    QUERY_ACK,
+    INVITE,
+    INVITE_ACK,
+    INVITE_NACK,
+    INVITE_OFFER,
+    INVITE_ACCEPT,
+    INVITE_DECLINE,
+    EXIT
 } messageTypes;
 
 typedef struct message {

@@ -224,6 +224,37 @@ message *parseInput(char *input) {
             strcpy(msg->data, "\0");
             return msg;
         }
+        else if (strncmp(input + 1, "invite ", 7) == 0) {
+            char *command = strtok(input, " ");
+            char *user = strtok(NULL, " ");
+            char *sessionID = strtok(NULL, "\0");
+            if (!command || !user || !sessionID) {
+                fprintf(stderr, "Invalid invite command\n");
+                return NULL;
+            }
+            msg->type = INVITE;
+            msg->size = strlen(user);
+            strcpy(msg->session, sessionID);
+            strcpy(msg->source, username);
+            strcpy(msg->data, user);
+            return msg;
+        }
+        else if (strncmp(input + 1, "accept", 6) == 0) {
+            msg->type = INVITE_ACCEPT;
+            msg->size = 0;
+            strcpy(msg->session, " ");
+            strcpy(msg->source, username);
+            strcpy(msg->data, "\0");
+            return msg;
+        }
+        else if (strncmp(input + 1, "decline", 7) == 0) {
+            msg->type = INVITE_DECLINE;
+            msg->size = 0;
+            strcpy(msg->session, " ");
+            strcpy(msg->source, username);
+            strcpy(msg->data, "\0");
+            return msg;
+        }
         else {
             fprintf(stderr, "Invalid command\n");
             return NULL;
@@ -286,24 +317,20 @@ void evaluateResponse(message* msg) {
             fprintf(stderr, "%s\n", msg->data);
             break;
         case LOGIN_ACK:
-            fprintf(stderr, "Login successful.\n");
+            fprintf(stderr, "Login successful\n");
             break;
         case LOGIN_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
         case LOGOUT_ACK:
-            fprintf(stderr, "Logout successful.\n");
+            fprintf(stderr, "Logout successful\n");
             strcpy(currentSessionName, "");
             break;
         case LOGOUT_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
-        case EXIT:
-            fprintf(stderr, "%s\n", msg->data);
-            exit(0);
-            break;
         case NEW_SESS_ACK:
-            fprintf(stderr, "Session %s created successfully.\n", msg->data);
+            fprintf(stderr, "Session %s created successfully\n", msg->data);
             strcpy(currentSessionName, msg->data);
             break;
         case NEW_SESS_NACK:
@@ -317,7 +344,7 @@ void evaluateResponse(message* msg) {
             fprintf(stderr, "%s\n", msg->data);
             break;
         case LEAVE_SESS_ACK:
-            fprintf(stderr, "Successfully left session.\n");
+            fprintf(stderr, "Successfully left session\n");
             strcpy(currentSessionName, "");
             break;
         case LEAVE_SESS_NACK:
@@ -329,6 +356,20 @@ void evaluateResponse(message* msg) {
             break;
         case QUERY_ACK:
             fprintf(stderr, "%s", msg->data);
+            break;
+        case INVITE_ACK:
+            fprintf(stderr, "Invite sent successfully\n");
+            break;
+        case INVITE_NACK:
+            fprintf(stderr, "%s\n", msg->data);
+            break;
+        case INVITE_OFFER:
+            fprintf(stderr, "Client %s is inviting you to session %s\n", msg->source, msg->session);
+            fprintf(stderr, "Please type /accept or /decline to accept or decline the invitation\n");
+            break;
+        case EXIT:
+            fprintf(stderr, "%s\n", msg->data);
+            exit(0);
             break;
         default:
             break;

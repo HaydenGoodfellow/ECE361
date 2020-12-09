@@ -282,6 +282,7 @@ Client *initClient(char *name, int clientfd) {
     newClient->numSessions = 0;
     newClient->talkingToSession = NULL;
     newClient->prevTalkingTo = NULL;
+    newClient->invitedTo = NULL;
     newClient->nextClient = NULL;
     newClient->prevClient = NULL;
     return newClient;

@@ -238,7 +238,7 @@ void *pollMetaSession(void *metaSessionPtr) {
                 fprintf(stderr, "Received data in meta session from client num: %d. Data: %s\n", i, input);
                 message *msg = parseMessageAsString(input);
                 // Check if they're trying to do a command while not logged in
-                if (!metaSession->clients[i]->loggedIn && msg->type != LOGIN) {
+                if (!metaSession->clients[i]->loggedIn && !(msg->type == LOGIN || msg->type == EXIT)) {
                     char response[] = "You must log in first!";
                     sendResponse(MESSAGE_NACK, response, client);
                 }
@@ -462,6 +462,75 @@ void performCommand(message *msg, Session *session, Client *client) {
             free(result);
             break; 
         }
+        case INVITE: { ;
+            // Check if client they're trying to invite exists
+            Client *invitingClient = clientExists(msg->data);
+            if (!invitingClient) {
+                fprintf(stderr, "Couldn't find client with name %s to invite from %s\n", msg->data, client->name);
+                sendResponse(INVITE_NACK, "Couldn't find client with that name to invite!", client);
+                return;
+            }
+            // Check if session they're trying to invite to exists
+            Session *invitingTo = searchForSession(msg->session);
+            if (!invitingTo) {
+                fprintf(stderr, "Couldn't find session with name %s to invite client %s to\n", msg->session, invitingClient->name);
+                sendResponse(INVITE_NACK, "Couldn't find session with that name to invite to!", client);
+                return;
+            }
+            // Check if the inviter is in the session they're trying to invite to
+            if (!clientIsInSession(client, session)) {
+                fprintf(stderr, "Client %s is not in session %s so they can't invite to it!\n", client->name, invitingTo->name);
+                sendResponse(INVITE_NACK, "You can't invite to a session you're not in!", client);
+                return;
+            }
+            // Check if the invitee is already in the session they're being invited to
+            if (clientIsInSession(invitingClient, invitingTo)) {
+                fprintf(stderr, "Client %s is already in session %s which they're being invited to!\n", invitingClient->name, invitingTo->name);
+                sendResponse(INVITE_NACK, "That person is already in that session!", client);
+                return;
+            }
+            // Send the invite and store which session they've been invited to
+            message *invite = malloc(sizeof(message));
+            invite->type = INVITE_OFFER;
+            invite->size = 0;
+            strcpy(invite->session, msg->session);
+            strcpy(invite->source, msg->source);
+            invite->data[0] = '\0';
+            unsigned strLength;
+            char *msgAsString = messageToString(invite, &strLength);
+            send(invitingClient->clientfd, msgAsString, strLength, 0);
+            invitingClient->invitedTo = strdup(invitingTo->name);
+            // Send acknowledgement to client
+            sendResponse(INVITE_ACK, "", client);
+            break;
+        }
+        case INVITE_ACCEPT: { ;
+            Session *joiningSession = searchForSession(client->invitedTo);
+            // Check if session they're accepting invite to still exists
+            if (!joiningSession) {
+                fprintf(stderr, "Couldn't find session with name %s to accept invite to\n", client->invitedTo);
+                sendResponse(INVITE_NACK, "Session you're trying to accept invite to no longer exists!", client);
+                return;
+            }
+            // Check if they're already in session they're trying to accept invite to
+            if (clientIsInSession(client, joiningSession)) {
+                fprintf(stderr, "Client %s is already in session %s which they're accepting invite to\n", client->name, joiningSession->name);
+                sendResponse(INVITE_NACK, "You are already in the session you're trying to accept an invite to!", client);
+                return;
+            }
+            // Add them to session and switch to it
+            addClientToSession(client, joiningSession);
+            sendResponse(JOIN_SESS_ACK, joiningSession->name, client);
+            free(client->invitedTo);
+            client->invitedTo = NULL;
+            break;
+        }
+        case INVITE_DECLINE: { ; 
+            free(client->invitedTo);
+            client->invitedTo = NULL;
+            sendResponse(INVITE_NACK, "Declined invite", client);
+            break;
+        }
         case EXIT:
             removeClientFromAllSessions(client);
             removeClientFromList(client);
@@ -469,6 +538,7 @@ void performCommand(message *msg, Session *session, Client *client) {
             removeClientFromSession(client, sessions->frontSession);
             free(client->name);
             free(client->password);
+            free(client->invitedTo);
             free(client);
             break;
         default:

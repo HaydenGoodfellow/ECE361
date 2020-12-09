@@ -22,7 +22,7 @@
 #define MAX_SOCKET_INPUT_SIZE 2048
 #define MAX_SESSIONS_PER_CLIENT 64
 #define MAX_CLIENTS_IN_SESSION 64
-#define MAX_TIMEOUT_NUMBER 10 // 600 5 minutes in 0.5 second timeouts
+#define MAX_TIMEOUT_NUMBER 100 // 600 5 minutes in 0.5 second timeouts
 
 // Forward declarations to avoid unknown type name errors
 typedef struct Client Client;
@@ -43,6 +43,8 @@ struct Client {
     // Session the client is currently sending messages to
     Session *talkingToSession;
     Session *prevTalkingTo; // Session it was talking to last
+    // Name of last session the client was invited to
+    char *invitedTo;
     // Pointers for the doubly linked list
     Client *nextClient;
     Client *prevClient;
