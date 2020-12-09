@@ -328,6 +328,7 @@ void performCommand(message *msg, Session *session, Client *client) {
         }
         case LOGOUT: {
             if (client->loggedIn) {
+                removeClientFromAllSessions(client);
                 // Free username
                 free(client->name);
                 client->name = strdup("Unknown");
@@ -336,7 +337,6 @@ void performCommand(message *msg, Session *session, Client *client) {
                 client->password = NULL;
                 // Mark as logged in
                 client->loggedIn = false;
-                removeClientFromSession(client, session);
                 // Send login acknowledgement
                 sendResponse(LOGOUT_ACK, "", client);
             }
@@ -404,13 +404,22 @@ void performCommand(message *msg, Session *session, Client *client) {
                 int strLength = 0; 
                 char sessionInfo[512];
                 // Change format when listing users that are not in a session
-                if (sessionData == sessions->frontSession)
+                if (sessionData == sessions->frontSession) {
+                    bool loggedInClients = false;
+                    for (int j = 0; j < sessionData->numClients; ++j) {
+                        if (strcmp(sessionData->clients[j]->name, "Unknown") != 0)
+                            loggedInClients = true;
+                    }
+                    if (!loggedInClients)
+                        continue;
                     strLength += sprintf(sessionInfo, "Users not in a session:\n");
+                }
                 else
                     strLength += sprintf(sessionInfo, "Session: %s\nUsers: \n", sessionData->name);
                 // Add names of users in sessions on new lines
                 for (int j = 0; j < sessionData->numClients; ++j) {
-                    strLength += sprintf(sessionInfo + strLength, "%s\n", sessionData->clients[j]->name);
+                    if (strcmp(sessionData->clients[j]->name, "Unknown") != 0)
+                        strLength += sprintf(sessionInfo + strLength, "%s\n", sessionData->clients[j]->name);
                 }
                 strcat(result, sessionInfo);
             }
@@ -420,7 +429,13 @@ void performCommand(message *msg, Session *session, Client *client) {
             break; 
         }
         case EXIT:
-            // TODO
+            removeClientFromAllSessions(client);
+            removeClientFromList(client);
+            sendResponse(EXIT, "", client);
+            updatePollfds(sessions->frontSession);
+            free(client->name);
+            free(client->password);
+            free(client);
             break;
         default:
             break;

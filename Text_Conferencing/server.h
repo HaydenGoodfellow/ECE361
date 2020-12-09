@@ -147,6 +147,12 @@ Client *initClient(char *name, int clientfd);
 // Add session to the end of the linked list of clients
 void addClientToList(Client *newClient);
 
+// Remove client from linked list when they disconnect/leave
+void removeClientFromList(Client *client);
+
+// Remove client from all sessions they are in
+void removeClientFromAllSessions(Client *client);
+
 // Get a client's object from a session given their socket file descriptor
 Client *getClientByFd(int clientfd, Session *session);
 

@@ -102,6 +102,12 @@ int main(int argc, char **argv) {
         // fprintf(stderr, "Sending data: %s\n", msgAsString);
         sendto(sockfd, msgAsString, strLength, MSG_CONFIRM, serverInfo->ai_addr, serverInfo->ai_addrlen);
         memset(userInput, '\0', MAX_USER_INPUT_SIZE);
+        if (msg->type == EXIT) { // Quiting program
+            fprintf(stderr, "Exit successful. Closing application\n");
+            close(sockfd);
+            free(msg);
+            exit(0);
+        }
         free(msg);
     }
     close(sockfd);
@@ -211,7 +217,12 @@ message *parseInput(char *input) {
             return msg;
         }
         else if (strncmp(input + 1, "quit", 4) == 0) {
-            exit(0);
+            msg->type = EXIT;
+            msg->size = 0;
+            strcpy(msg->session, " ");
+            strcpy(msg->source, username);
+            strcpy(msg->data, "\0");
+            return msg;
         }
         else {
             fprintf(stderr, "Invalid command\n");
@@ -282,6 +293,7 @@ void evaluateResponse(message* msg) {
             break;
         case LOGOUT_ACK:
             fprintf(stderr, "Logout successful.\n");
+            strcpy(currentSessionName, "");
             break;
         case LOGOUT_NACK:
             fprintf(stderr, "%s\n", msg->data);

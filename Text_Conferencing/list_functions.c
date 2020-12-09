@@ -305,6 +305,46 @@ void addClientToList(Client *newClient) {
     ++clients->numClients;
 }
 
+// Remove client from linked list when they disconnect/leave
+void removeClientFromList(Client *client) {
+    assert(client->numSessions == 0);
+    fprintf(stderr, "Removing client %s from list\n", client->name);
+    // Remove pointers to this client from the doubly linked list
+    if (client == clients->backClient && client == clients->frontClient) { // If only client
+        assert(client->nextClient == NULL);
+        assert(client->prevClient == NULL);
+        clients->frontClient = NULL;
+        clients->backClient = NULL;
+    }
+    else if (client == clients->backClient) { // If session is at end
+        assert(client->nextClient == NULL);
+        client->prevClient->nextClient = NULL;
+        clients->backClient = client->prevClient;
+    }
+    else if (client == clients->frontClient) {  // If session is at front
+        assert(client->prevClient == NULL);
+        client->nextClient->prevClient = NULL;
+        clients->frontClient = client->nextClient;
+    }   
+    else { // Must be in the middle of linked list
+        assert(client->prevClient && client->nextClient);
+        client->prevClient->nextClient = client->nextClient;
+        client->nextClient->prevClient = client->prevClient;
+    }
+}
+
+// Remove client from all sessions they are in
+void removeClientFromAllSessions(Client *client) {
+    fprintf(stderr, "Removing client %s from all %d sessions they are in\n", client->name, client->numSessions);
+    unsigned currNumSessions = client->numSessions;
+    for (unsigned i = 0; i < currNumSessions; ++i) {
+        fprintf(stderr, "In loop for client %s for session %s. Num sessions: %d\n", client->name, client->sessions[client->numSessions - 1]->name, client->numSessions);
+        removeClientFromSession(client, client->sessions[client->numSessions - 1]);
+    }
+    assert(client->talkingToSession == sessions->frontSession);
+    client->prevTalkingTo = NULL;
+}
+
 // Get a client's object from a session given their socket file descriptor
 Client *getClientByFd(int clientfd, Session *session) {
     if (!session->numClients || !session->clients)
