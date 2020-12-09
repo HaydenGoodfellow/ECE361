@@ -184,6 +184,17 @@ void *pollSession(void *sessionPtr) {
                 free(input);
                 free(msg);
             }
+            else if ((session->clientFds[i].revents & POLLRDHUP) || (session->clientFds[i].revents & POLLHUP)) { // Client disconnected
+                Client *client = getClientByFd(session->clientFds[i].fd, session);
+                fprintf(stderr, "Client %s disconnected. Removing client\n", client->name);
+                removeClientFromAllSessions(client);
+                removeClientFromList(client);
+                removeClientFromSession(client, sessions->frontSession);
+                free(client->name);
+                free(client->password);
+                free(client->invitedTo);
+                free(client);
+            }
         }
     }
     // fprintf(stderr, "Freeing data and exiting thread for session: %s\n", session->name);
@@ -252,6 +263,17 @@ void *pollMetaSession(void *metaSessionPtr) {
                 }
                 free(input);
                 free(msg);
+            }
+            else if ((metaSession->clientFds[i].revents & POLLRDHUP) || (metaSession->clientFds[i].revents & POLLHUP)) { // Client disconnected
+                Client *client = getClientByFd(metaSession->clientFds[i].fd, metaSession);
+                fprintf(stderr, "Client %s disconnected. Removing client\n", client->name);
+                removeClientFromAllSessions(client);
+                removeClientFromList(client);
+                removeClientFromSession(client, sessions->frontSession);
+                free(client->name);
+                free(client->password);
+                free(client->invitedTo);
+                free(client);
             }
         }
     }

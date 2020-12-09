@@ -249,7 +249,7 @@ void updatePollfds(Session *session) {
         if (session->clients[i]->talkingToSession == session) {
             fprintf(stderr, "%s ", session->clients[i]->name);
             session->clientFds[arrayIndex].fd = session->clients[i]->clientfd;
-            session->clientFds[arrayIndex].events = POLLIN;
+            session->clientFds[arrayIndex].events = POLLIN | POLLRDHUP;
             ++arrayIndex;
         }
     } 

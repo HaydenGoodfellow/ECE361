@@ -1,6 +1,9 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+// Allows us to poll for client closing app
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
