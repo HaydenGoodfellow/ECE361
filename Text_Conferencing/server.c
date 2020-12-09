@@ -186,14 +186,16 @@ void *pollSession(void *sessionPtr) {
             }
             else if ((session->clientFds[i].revents & POLLRDHUP) || (session->clientFds[i].revents & POLLHUP)) { // Client disconnected
                 Client *client = getClientByFd(session->clientFds[i].fd, session);
-                fprintf(stderr, "Client %s disconnected. Removing client\n", client->name);
-                removeClientFromAllSessions(client);
-                removeClientFromList(client);
-                removeClientFromSession(client, sessions->frontSession);
-                free(client->name);
-                free(client->password);
-                free(client->invitedTo);
-                free(client);
+                if (client) {
+                    fprintf(stderr, "Client %s disconnected. Removing client\n", client->name);
+                    removeClientFromAllSessions(client);
+                    removeClientFromList(client);
+                    removeClientFromSession(client, sessions->frontSession);
+                    free(client->name);
+                    free(client->password);
+                    free(client->invitedTo);
+                    free(client);
+                }
             }
         }
     }
@@ -266,14 +268,16 @@ void *pollMetaSession(void *metaSessionPtr) {
             }
             else if ((metaSession->clientFds[i].revents & POLLRDHUP) || (metaSession->clientFds[i].revents & POLLHUP)) { // Client disconnected
                 Client *client = getClientByFd(metaSession->clientFds[i].fd, metaSession);
-                fprintf(stderr, "Client %s disconnected. Removing client\n", client->name);
-                removeClientFromAllSessions(client);
-                removeClientFromList(client);
-                removeClientFromSession(client, sessions->frontSession);
-                free(client->name);
-                free(client->password);
-                free(client->invitedTo);
-                free(client);
+                if (client) {
+                    fprintf(stderr, "Client %s disconnected. Removing client\n", client->name);
+                    removeClientFromAllSessions(client);
+                    removeClientFromList(client);
+                    removeClientFromSession(client, sessions->frontSession);
+                    free(client->name);
+                    free(client->password);
+                    free(client->invitedTo);
+                    free(client);
+                }
             }
         }
     }
@@ -500,7 +504,7 @@ void performCommand(message *msg, Session *session, Client *client) {
                 return;
             }
             // Check if the inviter is in the session they're trying to invite to
-            if (!clientIsInSession(client, session)) {
+            if (!clientIsInSession(client, invitingTo)) {
                 fprintf(stderr, "Client %s is not in session %s so they can't invite to it!\n", client->name, invitingTo->name);
                 sendResponse(INVITE_NACK, "You can't invite to a session you're not in!", client);
                 return;

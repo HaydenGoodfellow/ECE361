@@ -83,8 +83,8 @@ void addClientToSession(Client *newClient, Session *session) {
         Session *oldSession = newClient->talkingToSession;
         newClient->talkingToSession = session;
         newClient->prevTalkingTo = oldSession;
-        if (newClient->prevTalkingTo)
-            fprintf(stderr, "Client %s talking to: %s. Old talking to: %s\n", newClient->name, newClient->talkingToSession->name, newClient->prevTalkingTo->name);
+        // if (newClient->prevTalkingTo)
+        //     fprintf(stderr, "Client %s talking to: %s. Old talking to: %s\n", newClient->name, newClient->talkingToSession->name, newClient->prevTalkingTo->name);
         ++session->numClients;
         updatePollfds(session);
         if (oldSession != NULL && !addingToMetaSession)
@@ -341,7 +341,7 @@ void removeClientFromAllSessions(Client *client) {
     fprintf(stderr, "Removing client %s from all %d sessions they are in\n", client->name, client->numSessions);
     unsigned currNumSessions = client->numSessions;
     for (unsigned i = 0; i < currNumSessions; ++i) {
-        fprintf(stderr, "In loop for client %s for session %s. Num sessions: %d\n", client->name, client->sessions[client->numSessions - 1]->name, client->numSessions);
+        // fprintf(stderr, "In loop for client %s for session %s. Num sessions: %d\n", client->name, client->sessions[client->numSessions - 1]->name, client->numSessions);
         removeClientFromSession(client, client->sessions[client->numSessions - 1]);
     }
     assert(client->talkingToSession == sessions->frontSession);
