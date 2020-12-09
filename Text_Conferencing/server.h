@@ -22,6 +22,7 @@
 #define MAX_SOCKET_INPUT_SIZE 2048
 #define MAX_SESSIONS_PER_CLIENT 64
 #define MAX_CLIENTS_IN_SESSION 64
+#define MAX_TIMEOUT_NUMBER 10 // 600 5 minutes in 0.5 second timeouts
 
 // Forward declarations to avoid unknown type name errors
 typedef struct Client Client;
@@ -32,6 +33,8 @@ struct Client {
     char *name;
     char *password; // Super not secure, only doing this for project
     bool loggedIn;
+    // Counter for number of timeouts have happened waiting for them
+    unsigned timeoutCount;
     // File descriptor for communication with client
     int clientfd;
     // Array which stores pointers to the sessions which the client is in
@@ -163,9 +166,12 @@ bool clientIsInSession(Client *client, Session *session);
 Client *clientExists(char *name);
 
 //==============================================//
-// Functions for checking logins (login_functions.c)
+// Functions for checking logins and inactivity (login_functions.c)
 //==============================================//
 // Ensure that the user information given matches what is store in database
 bool checkValidLogin(char* clientID, char* password, char *error);
+
+// Update timeout counter in all clients that the session was waiting on
+Client **updateTimeouts(Session *session, unsigned *numTimedOut);
 
 #endif // SERVER_H

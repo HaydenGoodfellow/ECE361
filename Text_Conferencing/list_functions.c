@@ -277,6 +277,7 @@ Client *initClient(char *name, int clientfd) {
     newClient->name = strdup(name); // Deep copy not shallow copy as the string is on stack
     newClient->password = NULL;
     newClient->loggedIn = false;
+    newClient->timeoutCount = 0;
     newClient->clientfd = clientfd;
     newClient->numSessions = 0;
     newClient->talkingToSession = NULL;
@@ -292,10 +293,11 @@ void addClientToList(Client *newClient) {
         fprintf(stderr, "Can't add client to list! Client is NULL\n");
         return;
     }
-    // If its the only session 
+    // If its the only client 
     if (clients->numClients == 0) {
         clients->frontClient = newClient;
         clients->backClient = newClient;
+        fprintf(stderr, "Client added to list as first element\n");
     }
     else { // Append to end
         clients->backClient->nextClient = newClient;

@@ -38,3 +38,20 @@ bool checkValidLogin(char* clientID, char* password, char *error) {
     strcpy(error, "Error: User with that name not found!");
     return false;  
 }
+
+// Update timeout counter in all clients that the session was waiting on
+Client **updateTimeouts(Session *session, unsigned *numTimedOut) {
+    Client **timedOutClients = malloc(sizeof(Client *) * session->numTalking);
+    Client *client = NULL;
+    for (unsigned i = 0; i < session->numTalking; ++i) {
+        client = getClientByFd(session->clientFds[i].fd, session);
+        assert(client);
+        ++client->timeoutCount;
+        if (client->timeoutCount > MAX_TIMEOUT_NUMBER) {
+            fprintf(stderr, "Client %s has timed out while in session %s\n", client->name, session->name);
+            timedOutClients[(*numTimedOut)] = client;
+            ++(*numTimedOut);
+        }
+    }
+    return timedOutClients;
+}

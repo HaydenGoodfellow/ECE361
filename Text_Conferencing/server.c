@@ -66,6 +66,7 @@ int main(int argc, char **argv) {
         int clientfd = accept(listenSock, (struct sockaddr *)&clientAddr, (socklen_t *)&clientAddrLen);
         // Create client object for newly connected client with unknown name
         Client *newClient = initClient("Unknown", clientfd);
+        addClientToList(newClient);
         addClientToSession(newClient, metaSession);
         // Create thread for meta session if one doesn't exist yet
         if (!threadForMetaSession) {
@@ -136,18 +137,34 @@ void *pollSession(void *sessionPtr) {
     while (!session->sessionDeleted) {
         // TODO: Implement measures for when a client disconnects. Currently hangs server thread
         unsigned numTalking; 
-        while (!(numTalking = session->numTalking))
+        while (!(numTalking = session->numTalking)) // While no one is talking in session spin
             ; // TODO: Make it not spin
         // fprintf(stderr, "Polling session: %s. Num talking: %d\n", session->name, session->numTalking);
-        int pollRet = poll(session->clientFds, numTalking, 8000);
-        if (pollRet == 0){
-            printf("timer timeout!\n");
-            //exit
+        int pollRet = poll(session->clientFds, numTalking, 500);
+        if (pollRet == 0) {
+            unsigned numTimedOut = 0;
+            Client **timedOutClients = updateTimeouts(session, &numTimedOut); // Only update timeouts on clients currently talking
+            if (numTimedOut) {
+                for (unsigned i = 0; i < numTimedOut; ++i) {
+                    fprintf(stderr, "Removing client %s for inactivity\n", timedOutClients[i]->name);
+                    removeClientFromAllSessions(timedOutClients[i]);
+                    removeClientFromList(timedOutClients[i]);
+                    sendResponse(EXIT, "You have been removed for inactivity!", timedOutClients[i]);
+                    removeClientFromSession(timedOutClients[i], sessions->frontSession);
+                    free(timedOutClients[i]->name);
+                    free(timedOutClients[i]->password);
+                    free(timedOutClients[i]);
+                }
+            }
+            free(timedOutClients);
             continue;
         }
         fprintf(stderr, "Received data on session \"%s\" socket. Num clients: %d. Num Talking:%d\n", session->name, session->numClients, numTalking);
         for (int i = 0; i < numTalking; ++i) {
             if (session->clientFds[i].revents & POLLIN) { // Got data from this client
+                // Reset the clients timeout
+                Client *client = getClientByFd(session->clientFds[i].fd, session);
+                client->timeoutCount = 0;
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
                 int bytesRecv = recv(session->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
                 input[bytesRecv] = '\0';
@@ -159,10 +176,10 @@ void *pollSession(void *sessionPtr) {
                     char *output = messageToString(msg, &strLength);
                     fprintf(stderr, "Broadcasting message: %s\n", output);
                     broadcastMessage(output, strLength, session, session->clientFds[i].fd);
-                    sendResponse(MESSAGE_ACK, "", getClientByFd(session->clientFds[i].fd, session));
+                    sendResponse(MESSAGE_ACK, "", client);
                 }
                 else {
-                    performCommand(msg, session, getClientByFd(session->clientFds[i].fd, session));
+                    performCommand(msg, session, client);
                 }
                 free(input);
                 free(msg);
@@ -190,14 +207,31 @@ void *pollMetaSession(void *metaSessionPtr) {
             fprintf(stderr, "Woke up in meta session thread\n");
         }
         unlock(&sessions->metaSessionLock);
-        int pollRet = poll(metaSession->clientFds, numClients, 8000); // Blocks, may change to timeout
-        if (pollRet == 0){
-            printf("timer timeout!\n");
+        int pollRet = poll(metaSession->clientFds, numClients, 500); // Blocks, may change to timeout
+        if (pollRet == 0) {
+            unsigned numTimedOut = 0;
+            Client **timedOutClients = updateTimeouts(metaSession, &numTimedOut); // Only update timeouts on clients currently talking
+            if (numTimedOut) {
+                for (unsigned i = 0; i < numTimedOut; ++i) {
+                    fprintf(stderr, "Removing client %s for inactivity\n", timedOutClients[i]->name);
+                    removeClientFromAllSessions(timedOutClients[i]);
+                    removeClientFromList(timedOutClients[i]);
+                    sendResponse(EXIT, "You have been removed for inactivity!", timedOutClients[i]);
+                    removeClientFromSession(timedOutClients[i], sessions->frontSession);
+                    free(timedOutClients[i]->name);
+                    free(timedOutClients[i]->password);
+                    free(timedOutClients[i]);
+                }
+            }
+            free(timedOutClients);
             continue;
         }
         fprintf(stderr, "Received data on meta session socket. Num clients: %d\n", metaSession->numClients);
         for (int i = 0; i < numClients; ++i) {
             if (metaSession->clientFds[i].revents & POLLIN) { // Got data from this client
+                // Reset this clients timeout
+                Client *client = getClientByFd(metaSession->clientFds[i].fd, metaSession);
+                client->timeoutCount = 0;
                 char *input = malloc(sizeof(char) * MAX_SOCKET_INPUT_SIZE);
                 int bytesRecv = recv(metaSession->clientFds[i].fd, input, MAX_SOCKET_INPUT_SIZE, 0);
                 input[bytesRecv] = '\0';
@@ -206,15 +240,15 @@ void *pollMetaSession(void *metaSessionPtr) {
                 // Check if they're trying to do a command while not logged in
                 if (!metaSession->clients[i]->loggedIn && msg->type != LOGIN) {
                     char response[] = "You must log in first!";
-                    sendResponse(MESSAGE_NACK, response, getClientByFd(metaSession->clientFds[i].fd, metaSession));
+                    sendResponse(MESSAGE_NACK, response, client);
                 }
                 // Ensure that the client sent a command and not a message
                 else if (msg->type == MESSAGE) {
                     char response[] = "You can't send messages until you create or join a session!";
-                    sendResponse(MESSAGE_NACK, response, getClientByFd(metaSession->clientFds[i].fd, metaSession));
+                    sendResponse(MESSAGE_NACK, response, client);
                 }
                 else {
-                    performCommand(msg, metaSession, getClientByFd(metaSession->clientFds[i].fd, metaSession));
+                    performCommand(msg, metaSession, client);
                 }
                 free(input);
                 free(msg);
@@ -432,7 +466,7 @@ void performCommand(message *msg, Session *session, Client *client) {
             removeClientFromAllSessions(client);
             removeClientFromList(client);
             sendResponse(EXIT, "", client);
-            updatePollfds(sessions->frontSession);
+            removeClientFromSession(client, sessions->frontSession);
             free(client->name);
             free(client->password);
             free(client);

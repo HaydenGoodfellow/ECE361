@@ -298,6 +298,10 @@ void evaluateResponse(message* msg) {
         case LOGOUT_NACK:
             fprintf(stderr, "%s\n", msg->data);
             break;
+        case EXIT:
+            fprintf(stderr, "%s\n", msg->data);
+            exit(0);
+            break;
         case NEW_SESS_ACK:
             fprintf(stderr, "Session %s created successfully.\n", msg->data);
             strcpy(currentSessionName, msg->data);
