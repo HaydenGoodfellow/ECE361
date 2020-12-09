@@ -345,7 +345,12 @@ void evaluateResponse(message* msg) {
             break;
         case LEAVE_SESS_ACK:
             fprintf(stderr, "Successfully left session\n");
-            strcpy(currentSessionName, "");
+            if (strcmp(msg->data, "Meta Session") != 0) {
+                fprintf(stderr, "Switched to talking in session: %s\n", msg->data);
+                strcpy(currentSessionName, msg->data);
+            }
+            else 
+                strcpy(currentSessionName, "");
             break;
         case LEAVE_SESS_NACK:
             fprintf(stderr, "%s\n", msg->data);

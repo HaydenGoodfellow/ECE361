@@ -442,13 +442,14 @@ void performCommand(message *msg, Session *session, Client *client) {
             }
             // Removes client from the session and deletes session if it is empty
             removeClientFromSession(client, session);
-            sendResponse(LEAVE_SESS_ACK, "", client);
-            if (client->talkingToSession != sessions->frontSession) { // Inform client which session theyve switched into
-                // unsigned responseLen = snprintf(NULL, 0, "Switched to talking in session: %s", client->talkingToSession->name); 
-                // char response[responseLen + 1];
-                // sprintf(response, "Switched to talking in session: %s", client->talkingToSession->name);
-                sendResponse(SWITCH_SESS, client->talkingToSession->name, client);
-            }
+            sendResponse(LEAVE_SESS_ACK, client->talkingToSession->name, client);
+            // if (client->talkingToSession != sessions->frontSession) { // Inform client which session theyve switched into
+            //     fprintf(stderr, "Sending switch packet for session %s\n", client->talkingToSession->name);
+            //     // unsigned responseLen = snprintf(NULL, 0, "Switched to talking in session: %s", client->talkingToSession->name); 
+            //     // char response[responseLen + 1];
+            //     // sprintf(response, "Switched to talking in session: %s", client->talkingToSession->name);
+            //     sendResponse(SWITCH_SESS, client->talkingToSession->name, client);
+            // }
             break;
         }
         case QUERY: { ;
@@ -494,6 +495,12 @@ void performCommand(message *msg, Session *session, Client *client) {
             if (!invitingClient) {
                 fprintf(stderr, "Couldn't find client with name %s to invite from %s\n", msg->data, client->name);
                 sendResponse(INVITE_NACK, "Couldn't find client with that name to invite!", client);
+                return;
+            }
+            // Check if they're inviting themselves
+            if (invitingClient == client) {
+                fprintf(stderr, "Client %s is trying to invite themselves\n", msg->data);
+                sendResponse(INVITE_NACK, "You cannot invite yourself to a session!", client);
                 return;
             }
             // Check if session they're trying to invite to exists
